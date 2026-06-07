@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="oklch(0.992 0.004 230)"></stop><stop offset="1" stop-color="oklch(0.952 0.01 224)"></stop>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" rx="114.69" ry="114.69" fill="url(#bg)"></rect>
+  <g transform="translate(20.757,20.757) scale(4.70486)">
+    <g style="mix-blend-mode:multiply">
+      <circle cx="38" cy="62" r="25" fill="oklch(0.62 0.085 235)" fill-opacity="0.52"></circle>
+      <circle cx="62" cy="38" r="25" fill="oklch(0.74 0.092 162)" fill-opacity="0.52"></circle>
+    </g>
+    <g transform="translate(35.5,35.5) scale(0.29)">
+    <clipPath id="clip512"><circle cx="50" cy="50" r="46"></circle></clipPath>
+    <circle cx="50" cy="50" r="46" fill="oklch(0.74 0.062 233)"></circle>
+    <g clip-path="url(#clip512)" fill="oklch(0.81 0.066 156)">
+      <path d="M14,29 C15,21 27,18 35,22 C40,24 41,27 40,31 C39,36 37,40 35,43 C34,46 33,48 32,49 C30,47 29,44 26,42 C20,39 13,36 14,29 Z"></path><path d="M31,48 C33,50 35,52 37,54 C38,55 37,56 35,55 C33,53 32,50 31,49 Z"></path><path d="M37,53 C42,51 46,53 47,59 C47,65 45,70 43,75 C41,81 38,85 36,82 C35,77 36,72 35,67 C33,62 32,57 35,54 C35,53 36,53 37,53 Z"></path><path d="M54,43 C56,39 60,38 65,38 C71,38 77,38 81,41 C83,44 83,48 81,52 C78,58 74,63 69,67 C67,69 65,68 64,65 C63,62 63,59 62,56 C61,54 59,54 58,52 C55,49 53,46 54,43 Z"></path><path d="M58,35 C56,31 57,27 60,26 C62,23 65,24 66,27 C69,25 72,27 74,30 C80,29 87,30 93,32 C98,33 99,36 98,40 C95,40 90,39 85,40 C81,41 79,43 77,41 C75,38 71,35 67,35 C63,35 60,37 58,35 Z"></path><path d="M42,17 C45,15 48,17 47,20 C46,22 43,22 42,20 Z"></path>
+    </g>
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#ffffff" stroke-width="1.1" opacity="0.35"></circle>
+    <path d="M22,16 A46 46 0 0 0 9,33" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" opacity="0.22"></path></g>
+  </g>
+</svg>

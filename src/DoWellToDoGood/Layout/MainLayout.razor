@@ -1,0 +1,44 @@
+@inherits LayoutComponentBase
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<div class="flex flex-col min-h-screen relative">
+
+    <div class="bubbles" aria-hidden="true">
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+        <span class="bubble"></span>
+    </div>
+
+    <header class="sticky top-0 z-10 border-b border-line bg-white/70 backdrop-blur">
+        <div class="mx-auto max-w-5xl px-6 py-3 flex items-center justify-between gap-4">
+            <a class="inline-flex items-center gap-2 no-underline" href="">
+                <img class="w-7 h-7 shrink-0 drop-shadow-sm" src="icons/icon.svg" alt="" width="28" height="28" />
+                <span class="brand-word text-lg sm:text-xl">do <span class="brand-well">well</span> to do <span class="brand-good">good</span></span>
+            </a>
+            <NavMenu />
+        </div>
+    </header>
+
+    <main id="main-content" class="relative z-[1] flex-1 py-12 overflow-x-clip">
+        @Body
+    </main>
+
+    <footer class="relative z-[1] border-t border-line mt-12 py-6 bg-white/50 backdrop-blur">
+        <div class="mx-auto max-w-5xl px-6 flex items-center justify-between gap-4 flex-wrap">
+            <div class="text-muted text-sm space-y-1">
+                <p class="m-0">Designed from the ground up for privacy. Your words are yours.</p>
+                <p class="m-0">Built by Dylan Smith and Claude in 2026.</p>
+            </div>
+            <a class="font-semibold" href="palette">Design preview</a>
+        </div>
+    </footer>
+
+</div>

@@ -1,0 +1,367 @@
+@import "tailwindcss";
+
+/* Scan Blazor markup for class names */
+@source "../**/*.{razor,html}";
+
+/* Self-hosted Quicksand (logo typeset) — no third-party font CDN, for privacy */
+@font-face {
+    font-family: "Quicksand"; font-style: normal; font-weight: 500; font-display: swap;
+    src: url("/fonts/quicksand-500.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Quicksand"; font-style: normal; font-weight: 600; font-display: swap;
+    src: url("/fonts/quicksand-600.woff2") format("woff2");
+}
+@font-face {
+    font-family: "Quicksand"; font-style: normal; font-weight: 700; font-display: swap;
+    src: url("/fonts/quicksand-700.woff2") format("woff2");
+}
+
+/* =====================================================================
+   Design tokens → Tailwind theme.
+   Defining --color-* / --radius-* / --shadow-* / --font-* here generates
+   matching utilities (bg-primary, text-muted, rounded-bubble, shadow-soft,
+   font-sans) AND exposes them as CSS vars (var(--color-emo-happy)) for the
+   places we set colors inline (the emotion wheel). Change the palette here
+   and it propagates everywhere.
+   ===================================================================== */
+@theme {
+    --color-bg: #eaf3fb;
+    --color-surface: #ffffff;
+    --color-surface-2: #f6fbfe;
+    --color-sunken: #eef4f9;
+
+    --color-ink: #233039;
+    --color-muted: #566773;
+
+    --color-line: #d8e6f0;
+    --color-line-strong: #bcd2e2;
+
+    --color-primary: #1f7d91;
+    --color-primary-hover: #196d7f;
+    --color-primary-soft: #d6ecf1;
+    --color-secondary: #6a5db8;
+    --color-secondary-hover: #5b4ea6;
+    --color-secondary-soft: #e6e2f6;
+    --color-link: #15708a;
+    --color-link-hover: #0f5c72;
+    --color-focus: #1f6fd0;
+    --color-danger: #b34a3f;
+    --color-success: #2f7d57;
+
+    --radius-bubble: 18px;
+    --radius-bubble-lg: 26px;
+    --radius-bubble-xl: 34px;
+
+    --shadow-soft-sm: 0 2px 8px rgba(46, 99, 140, 0.08);
+    --shadow-soft: 0 10px 30px rgba(46, 99, 140, 0.12);
+    --shadow-soft-lg: 0 22px 55px rgba(46, 99, 140, 0.18);
+
+    --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+        "Helvetica Neue", Arial, "Nunito", sans-serif;
+}
+
+/* Emotion-family + valence colors as plain custom properties so they are ALWAYS
+   emitted. We apply them via inline style="fill:var(--color-emo-...)" with names
+   built dynamically, which Tailwind's usage detection can't see — keeping them in
+   @theme would tree-shake the unreferenced ones (e.g. --color-emo-bad). */
+:root {
+    --color-valence-pos: #5ba6dd;
+    --color-valence-pos-soft: #d9ebf9;
+    --color-valence-neutral: #bcb6d4;
+    --color-valence-neutral-soft: #e8e4f1;
+    --color-valence-neg: #e07a64;
+    --color-valence-neg-soft: #f8e1d9;
+
+    /* Emotion families — soothing but a touch richer (Inside Out lineage) */
+    --color-emo-happy: #f1c453;     /* soft gold-yellow */
+    --color-emo-calm: #3fb0a4;      /* soft teal */
+    --color-emo-sad: #5f86d4;       /* soft cornflower blue */
+    --color-emo-fear: #9385da;      /* soft periwinkle purple */
+    --color-emo-angry: #df6f57;     /* soft coral-red */
+    --color-emo-disgust: #82b56f;   /* soft leaf green */
+    --color-emo-surprise: #ec8fb0;  /* soft rose pink */
+    --color-emo-bad: #9aa0ad;       /* readable medium gray */
+
+    --color-emo-happy-soft: #faecc4;
+    --color-emo-calm-soft: #d6efeb;
+    --color-emo-sad-soft: #dde6f7;
+    --color-emo-fear-soft: #e6e1f7;
+    --color-emo-angry-soft: #f7ddd5;
+    --color-emo-disgust-soft: #e3eedb;
+    --color-emo-surprise-soft: #f9e2ea;
+    --color-emo-bad-soft: #e7e9ee;
+
+    /* Brand wordmark accents (logo typeset) */
+    --color-brand-blue: #4a82bd;
+    --color-brand-green: #5e9e6a;
+}
+
+/* ===================== Brand wordmark (logo typeset) ===================== */
+.brand-word {
+    font-family: "Quicksand", ui-rounded, "Segoe UI", system-ui, sans-serif;
+    font-weight: 600;
+    color: var(--color-ink);
+    letter-spacing: -0.01em;
+}
+.brand-well { color: var(--color-brand-blue); }
+.brand-good { color: var(--color-brand-green); }
+
+/* ===================== Base ===================== */
+@layer base {
+    html, body { height: 100%; }
+
+    body {
+        background-color: var(--color-bg);
+        background-image:
+            radial-gradient(1200px 800px at 12% -10%, #f3eefb, transparent 60%),
+            radial-gradient(1000px 700px at 100% 0%, #eafaf6, transparent 55%),
+            linear-gradient(180deg, #e9f4fb, var(--color-bg));
+        background-attachment: fixed;
+        color: var(--color-ink);
+        font-family: var(--font-sans);
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3, h4 { font-family: "Quicksand", ui-rounded, "Segoe UI", system-ui, sans-serif; }
+    h1 { font-size: clamp(1.8rem, 1.2rem + 2.4vw, 2.8rem); font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; }
+    h2 { font-size: clamp(1.4rem, 1.1rem + 1.4vw, 1.9rem); font-weight: 700; line-height: 1.2; }
+    h3 { font-size: 1.25rem; font-weight: 600; }
+
+    a { color: var(--color-link); text-underline-offset: 2px; }
+    a:hover { color: var(--color-link-hover); }
+
+    :focus-visible {
+        outline: 3px solid var(--color-focus);
+        outline-offset: 2px;
+        border-radius: 6px;
+    }
+    h1:focus { outline: none; }
+}
+
+/* ===================== Components ===================== */
+@layer components {
+    .skip-link {
+        @apply absolute left-4 z-[1000] rounded-full px-4 py-3 no-underline;
+        top: -4rem;
+        background: var(--color-surface);
+        color: var(--color-ink);
+        box-shadow: var(--shadow-soft);
+        transition: top 0.18s ease;
+    }
+    .skip-link:focus { top: 1rem; }
+
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 font-semibold leading-none min-h-[2.9rem] px-6 py-3 rounded-full cursor-pointer no-underline transition;
+        border: 1.5px solid var(--color-line-strong);
+        background: var(--color-surface);
+        color: var(--color-ink);
+    }
+    .btn:hover { @apply -translate-y-px; box-shadow: var(--shadow-soft-sm); }
+    .btn:active { @apply translate-y-0; }
+    .btn:disabled, .btn[aria-disabled="true"] { @apply cursor-not-allowed translate-y-0; opacity: 0.55; }
+    .btn-primary { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+    .btn-primary:hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+    .btn-secondary { background: var(--color-secondary); color: #fff; border-color: var(--color-secondary); }
+    .btn-secondary:hover { background: var(--color-secondary-hover); border-color: var(--color-secondary-hover); }
+    .btn-ghost { background: transparent; border-color: transparent; color: var(--color-primary); }
+    .btn-ghost:hover { background: var(--color-primary-soft); }
+    .btn-lg { @apply min-h-[3.4rem] px-8 py-4 text-lg; }
+    .btn-block { @apply w-full; }
+
+    .card { @apply bg-surface rounded-bubble-lg p-6 sm:p-8; border: 1px solid var(--color-line); box-shadow: var(--shadow-soft); }
+    .card-soft { @apply rounded-bubble-lg p-6; background: var(--color-surface-2); border: 1px solid var(--color-line); }
+
+    .label { @apply block font-semibold mb-2; color: var(--color-ink); }
+    .field { @apply block mb-6; }
+    .hint { @apply block text-sm mt-2; color: var(--color-muted); }
+
+    .input, .textarea, .select {
+        @apply w-full rounded-bubble px-4 py-3 min-h-[2.9rem];
+        font: inherit;
+        color: var(--color-ink);
+        background: var(--color-surface);
+        border: 1.5px solid var(--color-line-strong);
+        transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .textarea { @apply rounded-bubble-lg min-h-[8rem]; resize: vertical; line-height: 1.6; }
+    .input:focus, .textarea:focus, .select:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px var(--color-primary-soft);
+    }
+    .valid.modified:not([type=checkbox]) { border-color: var(--color-success); }
+    .invalid { border-color: var(--color-danger); }
+    .validation-message { color: var(--color-danger); font-size: 0.9rem; }
+
+    .badge { @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold; background: var(--color-primary-soft); color: var(--color-primary-hover); }
+
+    .nav-link {
+        @apply rounded-full px-4 py-2 font-semibold no-underline transition;
+        color: var(--color-ink);
+    }
+    .nav-link:hover { background: var(--color-primary-soft); color: var(--color-primary-hover); }
+    .nav-link.active { background: var(--color-primary); color: #fff; }
+
+    .chip {
+        @apply inline-flex items-center font-semibold rounded-full px-4 min-h-[2.5rem] cursor-pointer transition;
+        background: var(--chip-soft, var(--color-surface-2));
+        color: var(--color-ink);
+        border: 1.5px solid var(--chip, var(--color-line-strong));
+    }
+    .chip:hover { @apply -translate-y-px; box-shadow: var(--shadow-soft-sm); }
+    .chip.is-selected { box-shadow: inset 0 0 0 2px var(--chip), 0 0 0 3px var(--chip-soft); }
+    .chip.is-selected::before { content: "✓ "; @apply font-extrabold; }
+}
+
+/* ===================== Emotion wheel ===================== */
+/* container-type lets labels size with the wheel (cqw units), not the viewport */
+.wheel-stage { position: relative; width: 100%; max-width: 660px; margin-inline: auto; container-type: inline-size; overflow: hidden; border-radius: 20px; }
+/* SVG + labels live together in here so a single transform zooms both, keeping labels aligned */
+.wheel-zoomable { position: relative; transform-origin: 0 0; transition: transform 0.35s ease; }
+.wheel-svg { width: 100%; height: auto; display: block; }
+
+.wheel-wedge { cursor: pointer; outline: none; }
+.wheel-wedge path { stroke: #ffffff; stroke-width: 1.4; transition: opacity 0.15s ease, filter 0.15s ease; }
+.wheel-wedge:hover path { filter: brightness(1.08) saturate(1.05); }
+.wheel-wedge:focus-visible path { stroke: var(--color-focus); stroke-width: 3.5; }
+
+/* When a feeling is selected: dim the rest, spotlight the choice */
+.wheel-svg.has-selection .wheel-wedge:not(.is-selected) path { opacity: 0.42; }
+.wheel-svg.has-selection .wheel-wedge:not(.is-selected):hover path { opacity: 1; }
+.wheel-wedge.is-selected path {
+    stroke: #14202a;
+    stroke-width: 5;
+    filter: brightness(1.06) drop-shadow(0 0 7px rgba(20, 32, 42, 0.45));
+}
+
+.wheel-hub { fill: #ffffff; stroke: var(--color-line); stroke-width: 2; }
+
+.wheel-labels { position: absolute; inset: 0; pointer-events: none; }
+.wheel-label {
+    position: absolute;
+    color: #16212b;
+    text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff;
+    white-space: nowrap;
+    line-height: 1;
+}
+.wheel-label-1 { font-weight: 800; font-size: clamp(0.8rem, 3.5cqw, 1.5rem); }
+.wheel-label-2 { font-weight: 700; font-size: clamp(0.62rem, 2.45cqw, 1.05rem); }
+.wheel-label-3 { font-weight: 600; font-size: clamp(0.55rem, 1.95cqw, 0.85rem); }
+.wheel-label.is-selected {
+    color: #0f1a22;
+    font-weight: 800;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 0 2px #14202a;
+    border-radius: 6px;
+    padding: 1px 5px;
+    text-shadow: none;
+}
+
+.wheel-hub-content {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 7rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+}
+/* The centered hub text doesn't fit the small center hole on phones — hide it
+   there (the prompt/selection is shown above the wheel instead). */
+@media (max-width: 639.98px) { .wheel-hub-content { display: none; } }
+.wheel-hub-title { color: var(--color-muted); font-weight: 700; font-size: clamp(0.8rem, 3cqw, 1.05rem); line-height: 1.1; }
+.wheel-hub-name { color: var(--color-ink); font-weight: 800; font-size: clamp(0.9rem, 3.6cqw, 1.25rem); line-height: 1.05; }
+.wheel-hub-sub { color: var(--color-muted); font-weight: 700; font-size: clamp(0.55rem, 1.8cqw, 0.72rem); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.wheel-def { background: var(--color-surface-2); border: 1px solid var(--color-line); border-radius: var(--radius-bubble-lg); padding: 1.25rem; min-height: 6.5rem; }
+.wheel-def-name { font-weight: 800; font-size: 1.05rem; margin: 0; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.wheel-def-dot { display: inline-block; width: 0.9rem; height: 0.9rem; border-radius: 50%; }
+.wheel-def-badge { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #fff; background: var(--color-primary); border-radius: 999px; padding: 0.1rem 0.5rem; }
+.wheel-def-trail { margin: 0.2rem 0 0 0; color: var(--color-muted); font-size: 0.82rem; }
+.wheel-def-text { margin: 0.5rem 0 0 0; color: var(--color-muted); }
+
+/* ===================== Bubble background field ===================== */
+.bubbles { position: fixed; inset: 0; overflow: hidden; z-index: 0; pointer-events: none; }
+.bubble {
+    position: absolute;
+    width: 7rem;
+    aspect-ratio: 1;             /* always a perfect circle, even when width is overridden */
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%,
+        rgba(255, 255, 255, 0.65),
+        rgba(150, 195, 225, 0.20) 58%,
+        rgba(150, 195, 225, 0) 80%);
+    filter: blur(2.5px);         /* soft edges, but a touch more present */
+    opacity: 0.62;
+    animation: bob 16s ease-in-out infinite alternate;
+}
+.bubble:nth-child(1)  { width: 9rem;   left: 5%;  top: 14%; animation-duration: 17s; }
+.bubble:nth-child(2)  { width: 5rem;   left: 22%; top: 64%; animation-duration: 14s; animation-delay: -2s; }
+.bubble:nth-child(3)  { width: 14rem;  left: 38%; top: 6%;  opacity: 0.38; animation-duration: 21s;
+                        background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.55), rgba(165,150,215,.15) 58%, rgba(165,150,215,0) 80%); }
+.bubble:nth-child(4)  { width: 6rem;   left: 57%; top: 72%; animation-duration: 15s; animation-delay: -4s; }
+.bubble:nth-child(5)  { width: 8rem;   left: 74%; top: 20%; animation-duration: 18s;
+                        background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.6), rgba(120,205,190,.18) 58%, rgba(120,205,190,0) 80%); }
+.bubble:nth-child(6)  { width: 4.5rem; left: 87%; top: 58%; animation-duration: 13s; animation-delay: -1s; }
+.bubble:nth-child(7)  { width: 11rem;  left: 11%; top: 78%; opacity: 0.4; animation-duration: 20s;
+                        background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.55), rgba(165,150,215,.15) 58%, rgba(165,150,215,0) 80%); }
+.bubble:nth-child(8)  { width: 5.5rem; left: 49%; top: 42%; animation-duration: 16s; animation-delay: -3s; }
+.bubble:nth-child(9)  { width: 7rem;   left: 90%; top: 10%; animation-duration: 19s;
+                        background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.6), rgba(120,205,190,.18) 58%, rgba(120,205,190,0) 80%); }
+.bubble:nth-child(10) { width: 4.5rem; left: 32%; top: 33%; animation-duration: 14s; animation-delay: -5s; }
+
+@keyframes bob {
+    from { transform: translateY(0) translateX(0) scale(1); }
+    to   { transform: translateY(-26px) translateX(10px) scale(1.05); }
+}
+
+/* Release-view bubbles */
+.release-bubbles span {
+    position: absolute; bottom: -2rem; width: 1.5rem; height: 1.5rem; border-radius: 50%;
+    background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.95), rgba(120,180,220,.35) 60%, rgba(120,180,220,.1));
+    opacity: 0; animation: release-rise 3.2s ease-in forwards;
+}
+.release-bubbles span:nth-child(1) { left: 18%; animation-delay: 0s;   width: 1.2rem; height: 1.2rem; }
+.release-bubbles span:nth-child(2) { left: 38%; animation-delay: 0.3s; width: 2rem;   height: 2rem; }
+.release-bubbles span:nth-child(3) { left: 55%; animation-delay: 0.1s; }
+.release-bubbles span:nth-child(4) { left: 72%; animation-delay: 0.5s; width: 1rem;   height: 1rem; }
+.release-bubbles span:nth-child(5) { left: 85%; animation-delay: 0.2s; width: 1.7rem; height: 1.7rem; }
+@keyframes release-rise {
+    0%   { transform: translateY(0) scale(0.6);   opacity: 0; }
+    20%  { opacity: 0.8; }
+    100% { transform: translateY(-16rem) scale(1); opacity: 0; }
+}
+
+/* ===================== Blazor loading + error UI ===================== */
+.app-loading {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; gap: 1.25rem; padding: 1rem;
+}
+.app-loading__logo {
+    width: 6.5rem; height: 6.5rem;
+    filter: drop-shadow(0 12px 26px rgba(46, 99, 140, 0.18));
+    animation: app-pulse 1.8s ease-in-out infinite;
+}
+@keyframes app-pulse {
+    0%, 100% { transform: scale(1);    opacity: 0.92; }
+    50%      { transform: scale(1.06); opacity: 1; }
+}
+.loading-progress-text { text-align: center; font-weight: 700; color: #566773; }
+.loading-progress-text:after { content: var(--blazor-load-percentage-text, "Loading…"); }
+
+#blazor-error-ui {
+    background: #fff6e6; border-top: 2px solid #a9721c; bottom: 0;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.12); display: none; left: 0;
+    padding: 0.8rem 1.5rem; position: fixed; width: 100%; z-index: 1000; color: #233039;
+}
+#blazor-error-ui .dismiss { cursor: pointer; position: absolute; right: 1rem; top: 0.7rem; }
+.blazor-error-boundary { background: #b34a3f; padding: 1rem 1.5rem; color: #fff; border-radius: 18px; }
+.blazor-error-boundary::after { content: "Something went wrong here."; }
+
+/* ===================== Motion preferences ===================== */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+    .release-bubbles { display: none; }
+}

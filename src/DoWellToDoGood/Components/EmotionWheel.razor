@@ -1,0 +1,267 @@
+@using DoWellToDoGood.Models
+@using Microsoft.AspNetCore.Components.Web
+@inject IJSRuntime JS
+
+<div class="space-y-4" @onmouseleave="ResetActive">
+
+    <p id="wheel-help" class="sr-only">
+        Use the arrow keys to move between feelings and press Enter to choose one. The inner ring holds core
+        feelings; rings further out are more specific.
+    </p>
+
+    <div class="flex items-center gap-3 min-h-[2.25rem]">
+        @* On small screens the centered hub text doesn't fit, so show the prompt/selection here instead *@
+        <p class="m-0 font-semibold text-muted sm:hidden">@(_selected?.Name ?? "How do you feel?")</p>
+        @if (_zoomCoreKey is not null)
+        {
+            <button type="button"
+                    class="ml-auto inline-flex items-center gap-1 rounded-full border border-line bg-surface px-3 py-1.5 text-sm font-semibold text-ink transition hover:bg-primary-soft"
+                    @onclick="ZoomOut" aria-label="Zoom back out to the whole wheel">
+                ↺ Whole wheel
+            </button>
+        }
+        else
+        {
+            <span class="ml-auto text-muted text-xs">Tap a color to zoom in</span>
+        }
+    </div>
+
+    <div class="wheel-stage">
+        <div class="wheel-zoomable" style="transform:@CurrentZoomTransform">
+            <svg viewBox="0 0 600 600" class="wheel-svg @(_selected is not null ? "has-selection" : "")"
+                 role="group" aria-label="Feelings wheel" aria-describedby="wheel-help">
+                @for (int i = 0; i < _segs.Count; i++)
+                {
+                    var idx = i;
+                    var s = _segs[i];
+                    <g class="wheel-wedge @(IsSelected(s.Info) ? "is-selected" : "")"
+                       role="button" tabindex="@(idx == _focusIndex ? 0 : -1)" data-i="@idx"
+                       aria-pressed="@(IsSelected(s.Info) ? "true" : "false")"
+                       aria-label="@s.AriaLabel"
+                       @onclick="() => Select(s.Info, idx)"
+                       @onkeydown="e => OnKey(e, s.Info, idx)"
+                       @onmouseenter="() => SetActive(s.Info)"
+                       @onfocus="() => OnWedgeFocus(s.Info, idx)">
+                        <title>@s.Info.Name — @s.Info.Definition</title>
+                        <path d="@s.Path" style="fill:var(--color-emo-@(s.Info.ColorKey)); fill-opacity:@s.FillOpacity" />
+                    </g>
+                }
+                <circle cx="300" cy="300" r="72" class="wheel-hub" />
+            </svg>
+
+            <div class="wheel-labels" aria-hidden="true">
+                @foreach (var s in _segs)
+                {
+                    <span class="wheel-label wheel-label-@s.Info.Tier @(IsSelected(s.Info) ? "is-selected" : "")"
+                          style="left:@(s.X)%; top:@(s.Y)%; transform:translate(-50%,-50%) rotate(@(s.Rot)deg)">@s.Info.Name</span>
+                }
+                @if (_zoomCoreKey is null)
+                {
+                    <span class="wheel-hub-content">
+                        @if (_selected is null)
+                        {
+                            <span class="wheel-hub-title">How do you feel?</span>
+                        }
+                        else
+                        {
+                            <span class="wheel-hub-name">@_selected.Name</span>
+                            <span class="wheel-hub-sub">selected</span>
+                        }
+                    </span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="wheel-def" aria-live="polite">
+        @if (_active is not null)
+        {
+            <p class="wheel-def-name">
+                <span class="wheel-def-dot" style="background:var(--color-emo-@(_active.ColorKey))" aria-hidden="true"></span>
+                @_active.Name
+                @if (IsSelected(_active))
+                {
+                    <span class="wheel-def-badge">✓ Selected</span>
+                }
+            </p>
+            @if (!string.IsNullOrEmpty(_active.Trail))
+            {
+                <p class="wheel-def-trail">@_active.Trail</p>
+            }
+            <p class="wheel-def-text">@_active.Definition</p>
+        }
+        else
+        {
+            <p class="text-muted m-0">Hover, focus, or tap any feeling to see what it means — then choose it.</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback<EmotionInfo> OnSelected { get; set; }
+
+    private EmotionInfo? _selected;
+    private EmotionInfo? _active;
+    private string? _zoomCoreKey;
+    private int _focusIndex;   // roving tabindex: the one wedge that's in the tab order
+
+    private const double ZoomScale = 2.2;
+
+    private record Seg(EmotionInfo Info, string Path, string FillOpacity, string X, string Y, string Rot, string AriaLabel);
+    private List<Seg> _segs = new();
+    private readonly Dictionary<string, string> _coreZoom = new();
+
+    private string CurrentZoomTransform
+        => (_zoomCoreKey is not null && _coreZoom.TryGetValue(_zoomCoreKey, out var t)) ? t : "none";
+
+    protected override void OnInitialized() => _segs = BuildSegments();
+
+    private List<Seg> BuildSegments()
+    {
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        var segs = new List<Seg>();
+        const double cx = 300, cy = 300;
+        double[] rIn = { 72, 152, 226 };
+        double[] rOut = { 152, 226, 296 };
+        double[] rLab = { 112, 189, 261 };
+        string[] opacity = { "1", "0.72", "0.5" };
+
+        int totalLeaves = EmotionCatalog.Cores.Sum(c => c.Secondaries.Sum(s => s.Tertiaries.Count));
+        double leaf = 2 * Math.PI / totalLeaves;
+        double a = -Math.PI / 2;
+
+        void Add(EmotionInfo info, double a0, double a1)
+        {
+            int tier = info.Tier;
+            string path = AnnularSector(cx, cy, rIn[tier - 1], rOut[tier - 1], a0, a1);
+            double mid = (a0 + a1) / 2;
+            var (lx, ly) = Polar(cx, cy, rLab[tier - 1], mid);
+            double deg = mid * 180.0 / Math.PI;
+            while (deg <= -180) deg += 360;
+            while (deg > 180) deg -= 360;
+            if (deg > 90 || deg < -90) deg += 180; // keep text upright
+            string aria = string.IsNullOrEmpty(info.Trail)
+                ? $"{info.Name}. {info.Definition}"
+                : $"{info.Name}, {info.Trail}. {info.Definition}";
+            segs.Add(new Seg(
+                info, path, opacity[tier - 1],
+                (lx / 600.0 * 100).ToString("0.##", ci),
+                (ly / 600.0 * 100).ToString("0.##", ci),
+                deg.ToString("0.#", ci),
+                aria));
+        }
+
+        foreach (var c in EmotionCatalog.Cores)
+        {
+            int coreLeaves = c.Secondaries.Sum(s => s.Tertiaries.Count);
+            double coreSpan = coreLeaves * leaf;
+            double coreMid = a + coreSpan / 2;
+
+            double cxs = 300 + 185 * Math.Cos(coreMid);
+            double cys = 300 + 185 * Math.Sin(coreMid);
+            double tx = 50 - ZoomScale * cxs / 6.0;
+            double ty = 50 - ZoomScale * cys / 6.0;
+            _coreZoom[c.Key] = string.Format(ci, "translate({0:0.##}%, {1:0.##}%) scale({2})", tx, ty, ZoomScale);
+
+            Add(new EmotionInfo(c.Name, c.Definition, c.Valence, c.ColorKey, c.Name, c.Key, 1, ""), a, a + coreSpan);
+
+            double sa = a;
+            foreach (var s in c.Secondaries)
+            {
+                double secSpan = s.Tertiaries.Count * leaf;
+                Add(new EmotionInfo(s.Name, s.Definition, s.Valence, c.ColorKey, c.Name, c.Key, 2, c.Name), sa, sa + secSpan);
+
+                double ta = sa;
+                foreach (var t in s.Tertiaries)
+                {
+                    Add(new EmotionInfo(t.Name, t.Definition, s.Valence, c.ColorKey, c.Name, c.Key, 3, $"{c.Name} › {s.Name}"), ta, ta + leaf);
+                    ta += leaf;
+                }
+                sa += secSpan;
+            }
+            a += coreSpan;
+        }
+
+        return segs;
+    }
+
+    private static (double x, double y) Polar(double cx, double cy, double r, double a)
+        => (cx + r * Math.Cos(a), cy + r * Math.Sin(a));
+
+    private static string AnnularSector(double cx, double cy, double r0, double r1, double a0, double a1)
+    {
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        var (x0o, y0o) = Polar(cx, cy, r1, a0);
+        var (x1o, y1o) = Polar(cx, cy, r1, a1);
+        var (x1i, y1i) = Polar(cx, cy, r0, a1);
+        var (x0i, y0i) = Polar(cx, cy, r0, a0);
+        int large = (a1 - a0) > Math.PI ? 1 : 0;
+        return string.Format(ci,
+            "M {0:0.##} {1:0.##} A {2:0.##} {2:0.##} 0 {3} 1 {4:0.##} {5:0.##} " +
+            "L {6:0.##} {7:0.##} A {8:0.##} {8:0.##} 0 {3} 0 {9:0.##} {10:0.##} Z",
+            x0o, y0o, r1, large, x1o, y1o, x1i, y1i, r0, x0i, y0i);
+    }
+
+    private async Task Select(EmotionInfo info, int idx)
+    {
+        _selected = info;
+        _active = info;
+        _focusIndex = idx;
+        if (info.Tier == 1) _zoomCoreKey = info.CoreKey; // zoom into a family when its core is chosen
+        await OnSelected.InvokeAsync(info);
+    }
+
+    private void SetActive(EmotionInfo info) => _active = info;
+
+    private void OnWedgeFocus(EmotionInfo info, int idx)
+    {
+        _active = info;
+        _focusIndex = idx;
+    }
+
+    // When the pointer leaves the wheel, fall back to showing the chosen feeling.
+    private void ResetActive() => _active = _selected;
+
+    private void ZoomOut() => _zoomCoreKey = null;
+
+    private async Task OnKey(KeyboardEventArgs e, EmotionInfo info, int idx)
+    {
+        switch (e.Key)
+        {
+            case "Enter":
+            case " ":
+            case "Spacebar":
+                await Select(info, idx);
+                break;
+            case "ArrowRight":
+            case "ArrowDown":
+                await MoveFocus(idx + 1);
+                break;
+            case "ArrowLeft":
+            case "ArrowUp":
+                await MoveFocus(idx - 1);
+                break;
+            case "Home":
+                await MoveFocus(0);
+                break;
+            case "End":
+                await MoveFocus(_segs.Count - 1);
+                break;
+        }
+    }
+
+    private async Task MoveFocus(int target)
+    {
+        int n = _segs.Count;
+        _focusIndex = ((target % n) + n) % n;     // wrap around
+        _active = _segs[_focusIndex].Info;          // keep the definition panel in sync
+        await JS.InvokeVoidAsync("dwtdgWheel.focus", _focusIndex);
+    }
+
+    private bool IsSelected(EmotionInfo? info)
+        => info is not null
+           && _selected is not null
+           && _selected.Name == info.Name
+           && _selected.CoreKey == info.CoreKey
+           && _selected.Tier == info.Tier;
+}

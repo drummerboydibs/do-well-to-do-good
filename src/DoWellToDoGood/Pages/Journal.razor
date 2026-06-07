@@ -1,0 +1,142 @@
+@page "/journal"
+@using DoWellToDoGood.Models
+
+<PageTitle>Write — Do Well to Do Good</PageTitle>
+
+<div class="mx-auto max-w-3xl px-6">
+
+    @if (_released)
+    {
+        <div class="card text-center relative overflow-hidden" @key="_releaseKey">
+            <div class="release-bubbles" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <h1 class="mt-4">Released.</h1>
+            <p class="text-lg text-muted">Your words are gone — only you heard them.</p>
+
+            @if (_tip is not null)
+            {
+                <div class="mx-auto my-6 max-w-lg rounded-bubble-lg border border-line p-5 text-left"
+                     style="background:linear-gradient(180deg, var(--color-primary-soft), var(--color-surface) 80%)">
+                    <p class="uppercase tracking-wider text-xs font-bold m-0 mb-2" style="color:var(--color-primary-hover)">
+                        A thought to carry with you
+                    </p>
+                    <p class="m-0 text-lg leading-relaxed">@_tip.Text</p>
+                    <p class="m-0 mt-3 text-sm text-muted">
+                        Source:
+                        <a href="@_tip.SourceUrl" target="_blank" rel="noopener noreferrer" class="font-semibold">@_tip.SourceName ↗</a>
+                    </p>
+                </div>
+                <p class="text-muted text-xs max-w-lg mx-auto">General wellbeing information, not medical advice. If you’re struggling, please reach out to a professional or someone you trust.</p>
+            }
+
+            <p class="mt-8"><button class="btn btn-primary btn-lg" @onclick="Reset">Write something new</button></p>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <h1>What’s on your mind?</h1>
+            <p class="text-muted">
+                This is your space. Right now nothing is saved — you’re writing in the open air.
+                <span class="font-semibold" style="color:var(--color-primary-hover)">Sign in later to keep entries privately, encrypted just for you.</span>
+            </p>
+
+            <div class="field mt-6">
+                <label class="label" for="emotion">How are you feeling?</label>
+                <div class="flex gap-3 flex-wrap">
+                    <input id="emotion" class="input flex-1 min-w-0" type="text"
+                           @bind="_emotion" @bind:event="oninput"
+                           list="emotion-list" autocomplete="off" maxlength="40"
+                           placeholder="Name it, or use the wheel…" />
+                    <button type="button" class="btn"
+                            aria-expanded="@_showWheel.ToString().ToLowerInvariant()"
+                            aria-controls="wheel-region"
+                            @onclick="ToggleWheel">
+                        @(_showWheel ? "Hide the Emotion Wheel" : "Show the Emotion Wheel")
+                    </button>
+                </div>
+                <datalist id="emotion-list">
+                    @foreach (var n in _allNames)
+                    {
+                        <option value="@n" />
+                    }
+                </datalist>
+                <span class="hint">Not sure what to call it? Open the wheel and hover any feeling for a definition.</span>
+            </div>
+
+            @if (_showWheel)
+            {
+                <div id="wheel-region" class="card-soft mb-6">
+                    <EmotionWheel OnSelected="HandleEmotionSelected" />
+                </div>
+            }
+
+            <div class="field">
+                <label class="label" for="body">Let it out</label>
+                <textarea id="body" class="textarea" rows="9" maxlength="20000"
+                          @bind="_body" @bind:event="oninput"
+                          placeholder="Whatever you’re carrying, put it here…"></textarea>
+                <span class="hint">@_body.Length / 20,000</span>
+            </div>
+
+            <div class="flex flex-wrap gap-3 mt-2">
+                <button class="btn btn-secondary btn-lg" disabled="@(!CanSubmit)" @onclick="ShoutIntoTheWind">
+                    Shout into the wind
+                </button>
+                <button class="btn btn-lg" disabled title="Saving privately needs an account — coming soon">
+                    Save my entry (sign in soon)
+                </button>
+            </div>
+            <p class="text-muted text-sm mt-4">
+                “Shout into the wind” releases your words and clears the screen.
+                They are never sent anywhere — everything stays in this browser, then disappears.
+            </p>
+        </div>
+    }
+</div>
+
+@code {
+    private string _emotion = string.Empty;
+    private string _body = string.Empty;
+    private bool _showWheel;
+    private EmotionInfo? _selectedEmotion;
+
+    private bool _released;
+    private Tip? _tip;
+    private int _releaseKey;
+
+    private readonly List<string> _allNames = EmotionCatalog.AllNames().ToList();
+
+    private bool CanSubmit => !string.IsNullOrWhiteSpace(_body);
+
+    private void ToggleWheel() => _showWheel = !_showWheel;
+
+    private void HandleEmotionSelected(EmotionInfo e)
+    {
+        _selectedEmotion = e;
+        _emotion = e.Name;
+    }
+
+    private void ShoutIntoTheWind()
+    {
+        if (!CanSubmit) return;
+
+        var resolved = _selectedEmotion ?? EmotionCatalog.Find(_emotion);
+        _tip = TipLibrary.Pick(resolved?.CoreKey);
+
+        // Release: nothing is persisted — just clear everything from memory.
+        _emotion = string.Empty;
+        _body = string.Empty;
+        _selectedEmotion = null;
+        _showWheel = false;
+        _released = true;
+        _releaseKey++;
+    }
+
+    private void Reset()
+    {
+        _released = false;
+        _tip = null;
+    }
+}

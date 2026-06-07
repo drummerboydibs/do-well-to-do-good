@@ -1,0 +1,15 @@
+{
+  "name": "do-well-to-do-good",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Tailwind CSS build for the Do Well to Do Good Blazor WASM app",
+  "scripts": {
+    "build:css": "tailwindcss -i ./Styles/tailwind.css -o ./wwwroot/css/app.css --minify",
+    "watch:css": "tailwindcss -i ./Styles/tailwind.css -o ./wwwroot/css/app.css --watch"
+  },
+  "devDependencies": {
+    "@fontsource/quicksand": "^5.2.10",
+    "@tailwindcss/cli": "^4.1.0",
+    "tailwindcss": "^4.1.0"
+  }
+}

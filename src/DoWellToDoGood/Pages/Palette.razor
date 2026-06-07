@@ -1,0 +1,120 @@
+@page "/palette"
+
+<PageTitle>Design preview — Do Well to Do Good</PageTitle>
+
+<div class="mx-auto max-w-5xl px-6 space-y-8">
+
+    <header class="space-y-4">
+        <span class="badge">Design preview</span>
+        <h1>Look &amp; feel</h1>
+        <p class="text-lg text-muted">Soothing, bubble-inspired, and built for privacy. Tell me which colors to adjust and I’ll update the whole system.</p>
+    </header>
+
+    <section class="card space-y-5" aria-labelledby="surfaces-h">
+        <h2 id="surfaces-h">Brand &amp; surfaces</h2>
+        <div class="flex flex-wrap gap-6">
+            @foreach (var s in Surfaces)
+            {
+                <div class="w-24 flex flex-col items-center gap-1 text-center">
+                    <span class="w-16 h-16 rounded-full border border-line shadow-soft" style="background:@s.Value"></span>
+                    <span class="font-semibold text-sm">@s.Name</span>
+                    <span class="text-muted text-xs">@s.Value</span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="card space-y-5" aria-labelledby="buttons-h">
+        <h2 id="buttons-h">Buttons &amp; controls</h2>
+        <div class="flex flex-wrap gap-3 items-center">
+            <button class="btn btn-primary">Save my entry</button>
+            <button class="btn btn-secondary">Shout into the wind</button>
+            <button class="btn">Show the Emotion Wheel</button>
+            <button class="btn btn-ghost">Skip</button>
+        </div>
+    </section>
+
+    <section class="card space-y-5" aria-labelledby="valence-h">
+        <h2 id="valence-h">Journal entry tint (emotional valence)</h2>
+        <p class="text-muted">Saved entries are tinted by how positive or negative the logged emotion is.</p>
+        <div class="h-10 rounded-full shadow-soft-sm" role="img"
+             aria-label="Gradient from calm blue for positive emotions to warm red for negative emotions"
+             style="background:linear-gradient(90deg, var(--color-valence-pos), var(--color-valence-neutral) 50%, var(--color-valence-neg))"></div>
+        <div class="flex justify-between text-muted text-sm">
+            <span>Positive · calm blue</span><span>Neutral</span><span>Negative · warm red</span>
+        </div>
+    </section>
+
+    <section class="card space-y-5" aria-labelledby="emotions-h">
+        <h2 id="emotions-h">Emotion accent colors</h2>
+        <p class="text-muted">Used on the Emotion Wheel to help you find a feeling.</p>
+        <div class="flex flex-wrap gap-6">
+            @foreach (var e in Emotions)
+            {
+                <div class="w-24 flex flex-col items-center gap-1 text-center">
+                    <span class="w-16 h-16 rounded-full border border-line shadow-soft" style="background:@e.Value"></span>
+                    <span class="font-semibold text-sm">@e.Name</span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="space-y-5" aria-labelledby="entries-h">
+        <h2 id="entries-h">Sample journal entries</h2>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach (var entry in SampleEntries)
+            {
+                <article class="rounded-bubble-lg border border-line shadow-soft-sm p-5"
+                         style="border-left:6px solid @entry.Tint; background:linear-gradient(180deg, @entry.TintSoft, var(--color-surface) 70%)">
+                    <header class="flex justify-between items-baseline gap-3 mb-3">
+                        <span class="font-bold">@entry.Emotion</span>
+                        <span class="text-muted text-xs">@entry.When</span>
+                    </header>
+                    <p class="m-0">@entry.Text</p>
+                </article>
+            }
+        </div>
+    </section>
+
+</div>
+
+@code {
+    private record Swatch(string Name, string Value);
+    private record SampleEntry(string Emotion, string When, string Text, string Tint, string TintSoft);
+
+    private readonly Swatch[] Surfaces =
+    {
+        new("Page", "var(--color-bg)"),
+        new("Surface", "var(--color-surface)"),
+        new("Sunken", "var(--color-sunken)"),
+        new("Primary", "var(--color-primary)"),
+        new("Secondary", "var(--color-secondary)"),
+        new("Text", "var(--color-ink)"),
+        new("Muted text", "var(--color-muted)"),
+        new("Border", "var(--color-line)"),
+    };
+
+    private readonly Swatch[] Emotions =
+    {
+        new("Happy", "var(--color-emo-happy)"),
+        new("Calm", "var(--color-emo-calm)"),
+        new("Sad", "var(--color-emo-sad)"),
+        new("Fearful", "var(--color-emo-fear)"),
+        new("Angry", "var(--color-emo-angry)"),
+        new("Disgusted", "var(--color-emo-disgust)"),
+        new("Surprised", "var(--color-emo-surprise)"),
+    };
+
+    private readonly SampleEntry[] SampleEntries =
+    {
+        new("Hopeful", "Today, 9:14 am",
+            "Slept badly but I still made it to the window for sunrise. Small win, but it counts.",
+            "var(--color-valence-pos)", "var(--color-valence-pos-soft)"),
+        new("Restless", "Yesterday, 11:02 pm",
+            "Mind won’t settle. Writing it down so it stops bouncing around in my head.",
+            "var(--color-valence-neutral)", "var(--color-valence-neutral-soft)"),
+        new("Overwhelmed", "Mon, 6:48 pm",
+            "Too much at once. I need to put one thing down before I can pick anything else up.",
+            "var(--color-valence-neg)", "var(--color-valence-neg-soft)"),
+    };
+}
