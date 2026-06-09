@@ -1,0 +1,64 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deploy at a time
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # Node is needed because the build runs the Tailwind CLI to compile app.css
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Publish (compiles Tailwind + Blazor WASM to static files)
+        run: dotnet publish src/DoWellToDoGood/DoWellToDoGood.csproj -c Release -o release
+
+      # GitHub project Pages serve from /<repo>/, so the base href must match
+      - name: Set base href for project Pages
+        run: sed -i 's|<base href="/" />|<base href="/do-well-to-do-good/" />|' release/wwwroot/index.html
+
+      # Client-side routing fallback: serve the app for unknown paths / deep links
+      - name: Add SPA 404 fallback
+        run: cp release/wwwroot/index.html release/wwwroot/404.html
+
+      # Stop Jekyll from deleting Blazor's _framework folder (starts with "_")
+      - name: Disable Jekyll
+        run: touch release/wwwroot/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: release/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
