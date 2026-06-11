@@ -1,5 +1,10 @@
 @page "/journal"
+@using System.Text.Json
 @using DoWellToDoGood.Models
+@using DoWellToDoGood.Services
+@inject AuthService Auth
+@inject CryptoService Crypto
+@inject EntriesService Entries
 
 <PageTitle>Write — Do Well to Do Good</PageTitle>
 
@@ -11,8 +16,16 @@
             <div class="release-bubbles" aria-hidden="true">
                 <span></span><span></span><span></span><span></span><span></span>
             </div>
-            <h1 class="mt-4">Released.</h1>
-            <p class="text-lg text-muted">Your words are gone — only you heard them.</p>
+            <h1 class="mt-4">@(_savedToJournal ? "Saved." : "Released.")</h1>
+            <p class="text-lg text-muted">
+                @(_savedToJournal
+                    ? "Your words are kept — encrypted so only you can read them."
+                    : "Your words are gone — only you heard them.")
+            </p>
+            @if (_savedToJournal)
+            {
+                <p><a class="font-semibold" href="entries">See my journal →</a></p>
+            }
 
             @if (_tip is not null)
             {
@@ -37,10 +50,20 @@
     {
         <div class="card">
             <h1>What’s on your mind?</h1>
-            <p class="text-muted">
-                This is your space. Right now nothing is saved — you’re writing in the open air.
-                <span class="font-semibold" style="color:var(--color-primary-hover)">Sign in later to keep entries privately, encrypted just for you.</span>
-            </p>
+            @if (Auth.IsSignedIn)
+            {
+                <p class="text-muted">
+                    This is your space. Save an entry to keep it — encrypted so only you can read it —
+                    or shout it into the wind and let it go without a trace.
+                </p>
+            }
+            else
+            {
+                <p class="text-muted">
+                    This is your space. Right now nothing is saved — you’re writing in the open air.
+                    <span class="font-semibold" style="color:var(--color-primary-hover)">Sign in later to keep entries privately, encrypted just for you.</span>
+                </p>
+            }
 
             <div class="field mt-6">
                 <label class="label" for="emotion">How are you feeling?</label>
@@ -80,14 +103,38 @@
                 <span class="hint">@_body.Length / 20,000</span>
             </div>
 
+            @if (Auth.IsSignedIn && !Crypto.IsUnlocked && _showVault)
+            {
+                <div class="mb-6">
+                    <VaultGate OnUnlocked="OnVaultUnlocked" />
+                </div>
+            }
+
             <div class="flex flex-wrap gap-3 mt-2">
                 <button class="btn btn-secondary btn-lg" disabled="@(!CanSubmit)" @onclick="ShoutIntoTheWind">
                     Shout into the wind
                 </button>
-                <button class="btn btn-lg" disabled title="Saving privately needs an account — coming soon">
-                    Save my entry (sign in soon)
-                </button>
+                @if (!Auth.IsSignedIn)
+                {
+                    <a class="btn btn-lg" href="signin">Sign in to save</a>
+                }
+                else if (!Crypto.IsUnlocked)
+                {
+                    <button class="btn btn-lg" disabled="@(!CanSubmit)" @onclick="() => _showVault = true">
+                        Save my entry…
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-primary btn-lg" disabled="@(!CanSubmit || _saving)" @onclick="SaveEntry">
+                        @(_saving ? "Encrypting & saving…" : "Save my entry")
+                    </button>
+                }
             </div>
+            @if (_saveError is not null)
+            {
+                <p class="text-sm font-semibold mt-3" style="color:var(--color-danger)" role="alert">@_saveError</p>
+            }
             <p class="text-muted text-sm mt-4">
                 “Shout into the wind” releases your words and clears the screen.
                 They are never sent anywhere — everything stays in this browser, then disappears.
@@ -103,6 +150,10 @@
     private EmotionInfo? _selectedEmotion;
 
     private bool _released;
+    private bool _savedToJournal;
+    private bool _showVault;
+    private bool _saving;
+    private string? _saveError;
     private Tip? _tip;
     private int _releaseKey;
 
@@ -137,6 +188,39 @@
     private void Reset()
     {
         _released = false;
+        _savedToJournal = false;
         _tip = null;
+    }
+
+    private void OnVaultUnlocked() => _showVault = false;
+
+    private async Task SaveEntry()
+    {
+        if (!CanSubmit || _saving) return;
+        _saveError = null;
+        _saving = true;
+        try
+        {
+            // Encrypt body + emotion together; the server only ever sees ciphertext.
+            var payload = JsonSerializer.Serialize(new { body = _body, emotion = _emotion.Trim() });
+            var blob = await Crypto.EncryptAsync(payload);
+            await Entries.InsertEntryAsync(blob);
+
+            var resolved = _selectedEmotion ?? EmotionCatalog.Find(_emotion);
+            _tip = TipLibrary.Pick(resolved?.CoreKey);
+
+            _emotion = string.Empty;
+            _body = string.Empty;
+            _selectedEmotion = null;
+            _showWheel = false;
+            _savedToJournal = true;
+            _released = true;
+            _releaseKey++;
+        }
+        catch
+        {
+            _saveError = "Couldn't save your entry. Check your connection and try again — your words are still here.";
+        }
+        finally { _saving = false; }
     }
 }

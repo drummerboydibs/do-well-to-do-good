@@ -1,5 +1,19 @@
+@using DoWellToDoGood.Services
+@implements IDisposable
+@inject AuthService Auth
+
 <nav class="flex gap-1 items-center flex-wrap" aria-label="Primary">
     <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink>
     <NavLink class="nav-link" href="journal">Write</NavLink>
-    <NavLink class="nav-link" href="palette">Design preview</NavLink>
+    @if (Auth.IsSignedIn)
+    {
+        <NavLink class="nav-link" href="entries">My journal</NavLink>
+    }
+    <NavLink class="nav-link" href="signin">@(Auth.IsSignedIn ? "Account" : "Sign in")</NavLink>
 </nav>
+
+@code {
+    protected override void OnInitialized() => Auth.Changed += OnAuthChanged;
+    private void OnAuthChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => Auth.Changed -= OnAuthChanged;
+}

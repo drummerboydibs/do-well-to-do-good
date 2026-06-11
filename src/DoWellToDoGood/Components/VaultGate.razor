@@ -1,0 +1,193 @@
+@using DoWellToDoGood.Services
+@inject CryptoService Crypto
+@inject EntriesService Entries
+@inject IJSRuntime JS
+
+<div class="card-soft space-y-4" role="region" aria-label="Private journal lock">
+
+    @if (_state == State.Loading)
+    {
+        <p class="text-muted m-0">Checking your encryption setup…</p>
+    }
+    else if (_state == State.Error)
+    {
+        <p class="m-0 font-semibold" style="color:var(--color-danger)" role="alert">Couldn't reach the server to check your encryption setup.</p>
+        <button class="btn" @onclick="LoadKeys">Try again</button>
+    }
+    else if (_state == State.Setup)
+    {
+        <h3 class="m-0">Set up your private key</h3>
+        <p class="text-muted m-0">
+            Your entries are encrypted on this device with a passphrase only you know.
+            <strong>We can never read them — and we can never reset this passphrase.</strong>
+            You'll get a one-time recovery code as a backup.
+        </p>
+        <div class="field">
+            <label class="label" for="vg-pass">Encryption passphrase</label>
+            <input id="vg-pass" class="input" type="password" @bind="_pass" autocomplete="new-password"
+                   placeholder="At least 10 characters" />
+            <span class="hint">Different from your email — this one never leaves your device.</span>
+        </div>
+        <div class="field">
+            <label class="label" for="vg-pass2">Confirm passphrase</label>
+            <input id="vg-pass2" class="input" type="password" @bind="_pass2" autocomplete="new-password" />
+        </div>
+        @if (_error is not null)
+        {
+            <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_error</p>
+        }
+        <button class="btn btn-primary" disabled="@_busy" @onclick="DoSetup">@(_busy ? "Creating your key…" : "Create my key")</button>
+    }
+    else if (_state == State.ShowRecovery)
+    {
+        <h3 class="m-0">Save your recovery code</h3>
+        <p class="text-muted m-0">
+            If you ever forget your passphrase, this code is the <strong>only</strong> other way to unlock
+            your journal. Keep it somewhere safe — it will not be shown again.
+        </p>
+        <p class="font-mono text-lg font-bold tracking-widest text-center m-0 p-4 rounded-bubble border border-line bg-surface select-all">@_recoveryCode</p>
+        <button class="btn" @onclick="CopyCode">@(_copied ? "Copied ✓" : "Copy code")</button>
+        <label class="flex items-center gap-2 font-semibold">
+            <input type="checkbox" @bind="_savedCode" />
+            I've saved my recovery code somewhere safe
+        </label>
+        <button class="btn btn-primary" disabled="@(!_savedCode)" @onclick="FinishSetup">Continue</button>
+    }
+    else if (_state == State.Unlock)
+    {
+        <h3 class="m-0">Unlock your journal</h3>
+        <p class="text-muted m-0">Enter your encryption passphrase to read and save entries on this device.</p>
+
+        @if (!_useRecovery)
+        {
+            <div class="field">
+                <label class="label" for="vg-unlock">Passphrase</label>
+                <input id="vg-unlock" class="input" type="password" @bind="_pass" autocomplete="current-password" />
+            </div>
+            @if (_error is not null)
+            {
+                <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_error</p>
+            }
+            <div class="flex gap-3 flex-wrap items-center">
+                <button class="btn btn-primary" disabled="@_busy" @onclick="DoUnlock">@(_busy ? "Unlocking…" : "Unlock")</button>
+                <button class="btn btn-ghost" @onclick="SwitchToRecovery">Use recovery code instead</button>
+            </div>
+        }
+        else
+        {
+            <div class="field">
+                <label class="label" for="vg-rec">Recovery code</label>
+                <input id="vg-rec" class="input" type="text" @bind="_recoveryInput" autocomplete="off"
+                       placeholder="XXXX-XXXX-XXXX-XXXX" />
+            </div>
+            @if (_error is not null)
+            {
+                <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_error</p>
+            }
+            <div class="flex gap-3 flex-wrap items-center">
+                <button class="btn btn-primary" disabled="@_busy" @onclick="DoRecoveryUnlock">@(_busy ? "Unlocking…" : "Unlock with code")</button>
+                <button class="btn btn-ghost" @onclick="SwitchToPassphrase">Back to passphrase</button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback OnUnlocked { get; set; }
+
+    private enum State { Loading, Error, Setup, ShowRecovery, Unlock }
+
+    private State _state = State.Loading;
+    private string _pass = "", _pass2 = "", _recoveryInput = "", _recoveryCode = "";
+    private string? _error;
+    private bool _busy, _savedCode, _copied, _useRecovery;
+    private EntriesService.KeyRecord? _keys;
+
+    protected override Task OnInitializedAsync() => LoadKeys();
+
+    private async Task LoadKeys()
+    {
+        _state = State.Loading;
+        _error = null;
+        try
+        {
+            _keys = await Entries.GetKeysAsync();
+            _state = _keys is null ? State.Setup : State.Unlock;
+        }
+        catch
+        {
+            _state = State.Error;
+        }
+    }
+
+    private async Task DoSetup()
+    {
+        _error = null;
+        if (_pass.Length < 10) { _error = "Your passphrase needs at least 10 characters."; return; }
+        if (_pass != _pass2) { _error = "Those passphrases don't match."; return; }
+        _busy = true;
+        try
+        {
+            var setup = await Crypto.SetupAsync(_pass);
+            await Entries.SaveKeysAsync(new(setup.KekSalt, setup.WrappedDek, setup.RecoverySalt, setup.RecoveryWrappedDek));
+            _recoveryCode = setup.RecoveryCode;
+            _pass = _pass2 = "";
+            _state = State.ShowRecovery;
+        }
+        catch
+        {
+            _error = "Something went wrong saving your key. Please try again.";
+            await Crypto.LockAsync();
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task FinishSetup()
+    {
+        _recoveryCode = "";
+        await OnUnlocked.InvokeAsync();
+    }
+
+    private async Task DoUnlock()
+    {
+        _error = null;
+        _busy = true;
+        try
+        {
+            if (!await Crypto.UnlockAsync(_pass, _keys!.KekSalt, _keys.WrappedDek))
+            {
+                _error = "That passphrase didn't work. Check it and try again.";
+                return;
+            }
+            _pass = "";
+            await OnUnlocked.InvokeAsync();
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task DoRecoveryUnlock()
+    {
+        _error = null;
+        _busy = true;
+        try
+        {
+            if (!await Crypto.UnlockWithRecoveryAsync(_recoveryInput, _keys!.RecoverySalt, _keys.RecoveryWrappedDek))
+            {
+                _error = "That code didn't work. Check it and try again.";
+                return;
+            }
+            _recoveryInput = "";
+            await OnUnlocked.InvokeAsync();
+        }
+        finally { _busy = false; }
+    }
+
+    private void SwitchToRecovery() { _useRecovery = true; _error = null; }
+    private void SwitchToPassphrase() { _useRecovery = false; _error = null; }
+
+    private async Task CopyCode()
+    {
+        await JS.InvokeVoidAsync("dwtdgUtil.copy", _recoveryCode);
+        _copied = true;
+    }
+}

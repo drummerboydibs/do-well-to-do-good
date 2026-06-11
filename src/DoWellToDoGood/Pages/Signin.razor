@@ -1,17 +1,88 @@
 @page "/signin"
+@using DoWellToDoGood.Services
+@inject AuthService Auth
+@inject CryptoService Crypto
+@inject NavigationManager Nav
 
 <PageTitle>Sign in — Do Well to Do Good</PageTitle>
 
 <div class="mx-auto max-w-md px-6">
-    <div class="card text-center space-y-4">
-        <img src="icons/icon.svg" alt="" class="mx-auto w-16 h-16 drop-shadow" width="64" height="64" />
-        <h1>Welcome</h1>
-        <p class="text-muted">
-            Passwordless sign-in with a magic link is coming very soon — you’ll get a one-time link by email,
-            so there’s no password to remember or store.
-        </p>
-        <p class="text-muted">In the meantime, you can start writing right now as a guest.</p>
-        <a class="btn btn-primary btn-lg btn-block" href="journal">Continue as a guest</a>
-        <p><a class="text-sm" href="">← Back home</a></p>
+    <div class="card space-y-4">
+        <img src="icons/icon.svg" alt="" class="mx-auto w-16 h-16 drop-shadow block" width="64" height="64" />
+
+        @if (Auth.IsSignedIn)
+        {
+            <h1 class="text-center">You're signed in</h1>
+            <p class="text-muted text-center">@Auth.Email</p>
+            <a class="btn btn-primary btn-block" href="journal">Start writing</a>
+            <a class="btn btn-block" href="entries">Open my journal</a>
+            <button class="btn btn-ghost btn-block" @onclick="SignOut">Sign out</button>
+        }
+        else if (_sent)
+        {
+            <h1 class="text-center">Check your email</h1>
+            <p class="text-muted text-center">
+                We sent a one-time sign-in link to <strong>@_email</strong>. Open it on this device
+                and you'll land back here, signed in.
+            </p>
+            <p class="text-muted text-sm text-center">It can take a minute to arrive. Check spam if it's shy.</p>
+            <button class="btn btn-ghost btn-block" @onclick="() => _sent = false">Use a different email</button>
+        }
+        else
+        {
+            <h1 class="text-center">Welcome</h1>
+            <p class="text-muted text-center">
+                Enter your email and we'll send you a one-time sign-in link.
+                No password to remember — or for anyone to steal.
+            </p>
+            <div class="field">
+                <label class="label" for="email">Email</label>
+                <input id="email" class="input" type="email" inputmode="email" autocomplete="email"
+                       @bind="_email" placeholder="you@example.com" />
+            </div>
+            @if (_error is not null)
+            {
+                <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_error</p>
+            }
+            <button class="btn btn-primary btn-block" disabled="@_busy" @onclick="Send">
+                @(_busy ? "Sending…" : "Email me a sign-in link")
+            </button>
+            <p class="text-muted text-sm text-center m-0">
+                New here? The same link creates your free account. Or
+                <a href="journal">continue as a guest</a> — nothing saved, ever.
+            </p>
+        }
     </div>
 </div>
+
+@code {
+    private string _email = "";
+    private string? _error;
+    private bool _busy, _sent;
+
+    private async Task Send()
+    {
+        _error = null;
+        var email = _email.Trim();
+        if (email.Length < 5 || !email.Contains('@') || !email.Contains('.'))
+        {
+            _error = "Please enter a valid email address.";
+            return;
+        }
+        _busy = true;
+        try
+        {
+            var (ok, err) = await Auth.SendMagicLinkAsync(email);
+            if (ok) _sent = true;
+            else _error = err;
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task SignOut()
+    {
+        await Crypto.LockAsync();   // wipe the encryption key from memory
+        await Auth.SignOutAsync();
+        Nav.NavigateTo("");
+    }
+}

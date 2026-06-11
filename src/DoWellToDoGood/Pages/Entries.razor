@@ -1,0 +1,127 @@
+@page "/entries"
+@using System.Text.Json
+@using DoWellToDoGood.Services
+@inject AuthService Auth
+@inject CryptoService Crypto
+@inject EntriesService Store
+@inject IJSRuntime JS
+
+<PageTitle>My journal — Do Well to Do Good</PageTitle>
+
+<div class="mx-auto max-w-3xl px-6 space-y-6">
+    <h1>My journal</h1>
+
+    @if (!Auth.IsSignedIn)
+    {
+        <div class="card text-center space-y-4">
+            <p class="text-muted m-0">Sign in to see your saved entries — encrypted so only you can read them.</p>
+            <a class="btn btn-primary" href="signin">Sign in</a>
+        </div>
+    }
+    else if (!Crypto.IsUnlocked)
+    {
+        <VaultGate OnUnlocked="Load" />
+    }
+    else if (_loading)
+    {
+        <p class="text-muted" role="status">Decrypting your entries…</p>
+    }
+    else if (_entries.Count == 0)
+    {
+        <div class="card text-center space-y-4">
+            <p class="text-muted m-0">Nothing saved yet. Your story starts whenever you're ready.</p>
+            <a class="btn btn-primary" href="journal">Write your first entry</a>
+        </div>
+    }
+    else
+    {
+        <p class="text-muted">
+            @_entries.Count saved @(_entries.Count == 1 ? "entry" : "entries"), newest first —
+            tinted from calm blue to warm red by how the moment felt.
+        </p>
+        <div class="space-y-4">
+            @foreach (var e in _entries)
+            {
+                <article class="rounded-bubble-lg border border-line shadow-soft-sm p-5"
+                         style="border-left:6px solid @e.Tint; background:linear-gradient(180deg, @e.TintSoft, var(--color-surface) 70%)">
+                    <header class="flex justify-between items-baseline gap-3 mb-2 flex-wrap">
+                        <span class="font-bold">@(string.IsNullOrWhiteSpace(e.Emotion) ? "Unnamed feeling" : e.Emotion)</span>
+                        <span class="text-muted text-xs">@e.CreatedAt.LocalDateTime.ToString("ddd, MMM d yyyy · h:mm tt")</span>
+                    </header>
+                    <p class="m-0 whitespace-pre-wrap">@e.Body</p>
+                    <footer class="mt-3 text-right">
+                        <button class="btn btn-ghost text-sm" @onclick="() => Delete(e.Id)">Delete</button>
+                    </footer>
+                </article>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading;
+    private List<DecryptedEntry> _entries = new();
+
+    private record DecryptedEntry(Guid Id, string Body, string Emotion, DateTimeOffset CreatedAt, string Tint, string TintSoft);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsSignedIn && Crypto.IsUnlocked) await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var rows = await Store.ListEntriesAsync();
+            var list = new List<DecryptedEntry>();
+            foreach (var row in rows)
+            {
+                string body, emotion = "";
+                try
+                {
+                    var json = await Crypto.DecryptAsync(row.Payload);
+                    using var doc = JsonDocument.Parse(json);
+                    body = doc.RootElement.GetProperty("body").GetString() ?? "";
+                    emotion = doc.RootElement.TryGetProperty("emotion", out var em) ? em.GetString() ?? "" : "";
+                }
+                catch
+                {
+                    body = "⚠ This entry couldn't be decrypted with the current key.";
+                }
+                var valence = EmotionCatalog.Find(emotion)?.Valence ?? 0;
+                list.Add(new(row.Id, body, emotion, row.CreatedAt, Tint(valence), TintSoft(valence)));
+            }
+            _entries = list;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Delete(Guid id)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this entry forever? This can't be undone."))
+            return;
+        await Store.DeleteEntryAsync(id);
+        _entries.RemoveAll(e => e.Id == id);
+    }
+
+    // Valence (-1..+1) → hex color along warm-red ← lavender-grey → calm-blue.
+    private static string Tint(double v) => Lerp(v, (0x5b, 0xa6, 0xdd), (0xbc, 0xb6, 0xd4), (0xe0, 0x7a, 0x64));
+    private static string TintSoft(double v) => Lerp(v, (0xd9, 0xeb, 0xf9), (0xe8, 0xe4, 0xf1), (0xf8, 0xe1, 0xd9));
+
+    private static string Lerp(double v, (int R, int G, int B) pos, (int R, int G, int B) neutral, (int R, int G, int B) neg)
+    {
+        v = Math.Clamp(v, -1, 1);
+        var target = v >= 0 ? pos : neg;
+        var t = Math.Abs(v);
+        int r = (int)Math.Round(neutral.R + (target.R - neutral.R) * t);
+        int g = (int)Math.Round(neutral.G + (target.G - neutral.G) * t);
+        int b = (int)Math.Round(neutral.B + (target.B - neutral.B) * t);
+        return $"#{r:x2}{g:x2}{b:x2}";
+    }
+}
