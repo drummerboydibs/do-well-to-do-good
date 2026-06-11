@@ -5,6 +5,7 @@
 @inject AuthService Auth
 @inject CryptoService Crypto
 @inject EntriesService Entries
+@inject TipHistoryService TipHistory
 
 <PageTitle>Write — Do Well to Do Good</PageTitle>
 
@@ -169,12 +170,11 @@
         _emotion = e.Name;
     }
 
-    private void ShoutIntoTheWind()
+    private async Task ShoutIntoTheWind()
     {
         if (!CanSubmit) return;
 
-        var resolved = _selectedEmotion ?? EmotionCatalog.Find(_emotion);
-        _tip = TipLibrary.Pick(resolved?.CoreKey);
+        _tip = await PickTipAsync();
 
         // Release: nothing is persisted — just clear everything from memory.
         _emotion = string.Empty;
@@ -194,6 +194,20 @@
 
     private void OnVaultUnlocked() => _showVault = false;
 
+    // Match the most specific feeling we can (wheel selection only counts if the
+    // field still says the same thing), avoid recently shown tips, remember this one.
+    private async Task<Tip> PickTipAsync()
+    {
+        var resolved = _selectedEmotion is not null
+            && string.Equals(_selectedEmotion.Name, _emotion.Trim(), StringComparison.OrdinalIgnoreCase)
+            ? _selectedEmotion
+            : EmotionCatalog.Find(_emotion);
+
+        var tip = TipLibrary.Pick(resolved, await TipHistory.GetRecentAsync());
+        await TipHistory.RecordAsync(tip.Id);
+        return tip;
+    }
+
     private async Task SaveEntry()
     {
         if (!CanSubmit || _saving) return;
@@ -206,8 +220,7 @@
             var blob = await Crypto.EncryptAsync(payload);
             await Entries.InsertEntryAsync(blob);
 
-            var resolved = _selectedEmotion ?? EmotionCatalog.Find(_emotion);
-            _tip = TipLibrary.Pick(resolved?.CoreKey);
+            _tip = await PickTipAsync();
 
             _emotion = string.Empty;
             _body = string.Empty;

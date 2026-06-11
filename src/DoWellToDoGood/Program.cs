@@ -11,6 +11,7 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<CryptoService>();
 builder.Services.AddScoped<EntriesService>();
+builder.Services.AddScoped<TipHistoryService>();
 
 var host = builder.Build();
 
