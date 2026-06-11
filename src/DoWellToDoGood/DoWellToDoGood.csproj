@@ -11,8 +11,14 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.27" PrivateAssets="all" />
   </ItemGroup>
 
-  <!-- Build Tailwind CSS (wwwroot/css/app.css) from Styles/tailwind.css before the app builds -->
-  <Target Name="TailwindBuild" BeforeTargets="Build">
+  <!-- Let the unit-test assembly reach internal parsing helpers -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="DoWellToDoGood.Tests" />
+  </ItemGroup>
+
+  <!-- Build Tailwind CSS (wwwroot/css/app.css) from Styles/tailwind.css before the app builds.
+       Skippable via -p:SkipTailwind=true so unit-test builds don't need Node/npm. -->
+  <Target Name="TailwindBuild" BeforeTargets="Build" Condition="'$(SkipTailwind)' != 'true'">
     <Exec Command="npm install" Condition="!Exists('node_modules')" />
     <Exec Command="npm run build:css" />
   </Target>
