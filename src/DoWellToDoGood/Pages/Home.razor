@@ -1,30 +1,55 @@
 @page "/"
+@using DoWellToDoGood.Services
+@implements IDisposable
+@inject AuthService Auth
 
 <PageTitle>Do Well to Do Good — private mental wellness journaling</PageTitle>
 
 <div class="overflow-x-clip">
 
     @* ===================== Hero ===================== *@
-    <section class="mx-auto max-w-3xl px-6 pt-4 pb-6 text-center space-y-5">
-        <img src="icons/icon.svg" alt="" class="mx-auto w-24 h-24 drop-shadow" width="96" height="96" />
-        <h1 class="brand-word leading-tight">do <span class="brand-well">well</span> to do <span class="brand-good">good</span></h1>
-        <p class="text-xl text-muted max-w-2xl mx-auto">
-            A mental wellness app to get you back to your best — so you can make the world better again.
-        </p>
-        <p class="font-semibold" style="color:var(--color-primary-hover)">Designed from the ground up for privacy.</p>
-
-        <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <a class="btn btn-primary btn-lg" href="signin">Create your free account</a>
-            <a class="btn btn-lg" href="signin">Sign in</a>
-        </div>
-
-        <div class="pt-3">
-            <a class="btn btn-ghost" href="journal">Continue as a guest →</a>
-            <p class="text-muted text-sm mt-2 max-w-md mx-auto">
-                Nothing you write is saved anywhere — just shout into the wind to give your thoughts a voice.
+    @if (Auth.IsSignedIn)
+    {
+        <section class="mx-auto max-w-3xl px-6 pt-4 pb-6 text-center space-y-5">
+            <img src="icons/icon.svg" alt="" class="mx-auto w-24 h-24 drop-shadow" width="96" height="96" />
+            <h1 class="brand-word leading-tight">Welcome back</h1>
+            <p class="text-xl text-muted max-w-2xl mx-auto">
+                Your calm place is ready whenever you are. Pick up where you left off, or start something new.
             </p>
-        </div>
-    </section>
+
+            <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                <a class="btn btn-primary btn-lg" href="journal">Start writing</a>
+                <a class="btn btn-lg" href="entries">My journal</a>
+            </div>
+
+            <div class="pt-3">
+                <a class="btn btn-ghost" href="signin">Account &amp; settings →</a>
+            </div>
+        </section>
+    }
+    else
+    {
+        <section class="mx-auto max-w-3xl px-6 pt-4 pb-6 text-center space-y-5">
+            <img src="icons/icon.svg" alt="" class="mx-auto w-24 h-24 drop-shadow" width="96" height="96" />
+            <h1 class="brand-word leading-tight">do <span class="brand-well">well</span> to do <span class="brand-good">good</span></h1>
+            <p class="text-xl text-muted max-w-2xl mx-auto">
+                A mental wellness app to get you back to your best — so you can make the world better again.
+            </p>
+            <p class="font-semibold" style="color:var(--color-primary-hover)">Designed from the ground up for privacy.</p>
+
+            <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                <a class="btn btn-primary btn-lg" href="signin">Create your free account</a>
+                <a class="btn btn-lg" href="signin">Sign in</a>
+            </div>
+
+            <div class="pt-3">
+                <a class="btn btn-ghost" href="journal">Continue as a guest →</a>
+                <p class="text-muted text-sm mt-2 max-w-md mx-auto">
+                    Nothing you write is saved anywhere — just shout into the wind to give your thoughts a voice.
+                </p>
+            </div>
+        </section>
+    }
 
     @* ===================== Features ===================== *@
     <section class="mx-auto max-w-5xl px-6 py-8">
@@ -98,10 +123,24 @@
                 ever saved at all.
             </p>
             <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <a class="btn btn-primary btn-lg" href="signin">Get started — it’s free</a>
-                <a class="btn btn-lg" href="journal">Try it as a guest</a>
+                @if (Auth.IsSignedIn)
+                {
+                    <a class="btn btn-primary btn-lg" href="journal">Start writing</a>
+                    <a class="btn btn-lg" href="entries">Open my journal</a>
+                }
+                else
+                {
+                    <a class="btn btn-primary btn-lg" href="signin">Get started — it’s free</a>
+                    <a class="btn btn-lg" href="journal">Try it as a guest</a>
+                }
             </div>
         </div>
     </section>
 
 </div>
+
+@code {
+    protected override void OnInitialized() => Auth.Changed += OnAuthChanged;
+    private void OnAuthChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => Auth.Changed -= OnAuthChanged;
+}
