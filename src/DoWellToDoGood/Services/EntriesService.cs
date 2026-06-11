@@ -56,6 +56,21 @@ public class EntriesService(AuthService auth)
         return await res.Content.ReadFromJsonAsync<List<EntryRow>>() ?? new();
     }
 
+    public record TimestampRow([property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);
+
+    /// <summary>
+    /// Just the creation timestamps — enough to count saved entries and build a
+    /// streak without pulling (or decrypting) any ciphertext payloads.
+    /// </summary>
+    public async Task<List<DateTimeOffset>> ListEntryTimestampsAsync()
+    {
+        using var res = await _http.SendAsync(Req(HttpMethod.Get,
+            "journal_entries?select=created_at&order=created_at.desc"));
+        res.EnsureSuccessStatusCode();
+        var rows = await res.Content.ReadFromJsonAsync<List<TimestampRow>>() ?? new();
+        return rows.Select(r => r.CreatedAt).ToList();
+    }
+
     public async Task DeleteEntryAsync(Guid id)
     {
         using var res = await _http.SendAsync(Req(HttpMethod.Delete, $"journal_entries?id=eq.{id}"));

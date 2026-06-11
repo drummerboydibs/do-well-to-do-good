@@ -12,10 +12,15 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<CryptoService>();
 builder.Services.AddScoped<EntriesService>();
 builder.Services.AddScoped<TipHistoryService>();
+builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<StatsService>();
 
 var host = builder.Build();
 
 // Pick up a magic-link redirect or restore a stored session before first render.
 await host.Services.GetRequiredService<AuthService>().InitializeAsync();
+
+// Load the saved theme preference so the Account toggle reflects it.
+await host.Services.GetRequiredService<ThemeService>().InitializeAsync();
 
 await host.RunAsync();

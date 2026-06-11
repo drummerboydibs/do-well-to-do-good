@@ -4,8 +4,19 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#a9c9e0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#a9c9e0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1620" media="(prefers-color-scheme: dark)" />
+    <!-- Resolve the saved theme before the stylesheet paints (avoids a flash). -->
+    <script>
+        (function () {
+            try {
+                var p = localStorage.getItem("dwtdg.theme") || "system";
+                var dark = p === "dark" || (p !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+                document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+            } catch (e) { /* no storage — fall back to the light default */ }
+        })();
+    </script>
     <title>Do Well to Do Good — private mental wellness journaling</title>
     <meta name="description"
           content="A mental wellness app to get you back to your best, so you can make the world better again. Designed from the ground up for privacy." />
@@ -40,6 +51,7 @@
         <a href="" class="reload">Reload</a>
         <a class="dismiss">🗙</a>
     </div>
+    <script src="js/theme.js"></script>
     <script src="js/wheel.js"></script>
     <script src="js/crypto.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
