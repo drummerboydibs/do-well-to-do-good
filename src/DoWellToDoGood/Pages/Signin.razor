@@ -2,9 +2,12 @@
 @using DoWellToDoGood.Services
 @inject AuthService Auth
 @inject CryptoService Crypto
+@inject EntriesService Store
+@inject StatsService Stats
+@inject ThemeService Theme
 @inject NavigationManager Nav
 
-<PageTitle>Sign in — Do Well to Do Good</PageTitle>
+<PageTitle>@(Auth.IsSignedIn ? "Account" : "Sign in") — Do Well to Do Good</PageTitle>
 
 <div class="mx-auto max-w-md px-6">
     <div class="card space-y-4">
@@ -12,11 +15,68 @@
 
         @if (Auth.IsSignedIn)
         {
-            <h1 class="text-center">You're signed in</h1>
-            <p class="text-muted text-center">@Auth.Email</p>
-            <a class="btn btn-primary btn-block" href="journal">Start writing</a>
-            <a class="btn btn-block" href="entries">Open my journal</a>
-            <button class="btn btn-ghost btn-block" @onclick="SignOut">Sign out</button>
+            <div class="space-y-1">
+                <h1 class="text-center">Account</h1>
+                <p class="text-muted text-center m-0">@Auth.Email</p>
+            </div>
+
+            <section aria-labelledby="stats-heading" class="space-y-3">
+                <h2 id="stats-heading" class="text-base font-bold m-0">Your journey</h2>
+                @if (_statsLoading)
+                {
+                    <p class="text-muted text-sm m-0" role="status">Counting…</p>
+                }
+                else
+                {
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="stat">
+                            <span class="stat-num">@(_savedCount?.ToString() ?? "—")</span>
+                            <span class="stat-label">Saved @(_savedCount == 1 ? "entry" : "entries")</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-num">@_shoutCount</span>
+                            <span class="stat-label">Shouted into the wind</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-num">@(_streak > 0 ? $"🔥 {_streak}" : "0")</span>
+                            <span class="stat-label">Day streak</span>
+                        </div>
+                    </div>
+                    @if (_streak > 0)
+                    {
+                        <p class="text-muted text-sm m-0">
+                            @_streak consecutive @(_streak == 1 ? "day" : "days") of showing up for yourself — keep it going.
+                        </p>
+                    }
+                    @if (_statsError)
+                    {
+                        <p class="text-muted text-sm m-0">Couldn't reach your saved entries just now; the count above may be incomplete.</p>
+                    }
+                }
+            </section>
+
+            <section aria-labelledby="appearance-heading" class="space-y-2">
+                <h2 id="appearance-heading" class="text-base font-bold m-0">Appearance</h2>
+                <fieldset class="segmented">
+                    <legend class="sr-only">Color theme</legend>
+                    @foreach (var opt in _themeOptions)
+                    {
+                        <label class="segmented-option">
+                            <input type="radio" name="theme" class="sr-only" value="@opt.Value"
+                                   checked="@(Theme.Current == opt.Value)"
+                                   @onchange="() => SetTheme(opt.Value)" />
+                            <span aria-hidden="true">@opt.Icon</span> @opt.Label
+                        </label>
+                    }
+                </fieldset>
+                <p class="hint">“System” follows your device. Dark mode meets the same AA contrast standards as light.</p>
+            </section>
+
+            <div class="space-y-3">
+                <a class="btn btn-primary btn-block" href="journal">Start writing</a>
+                <a class="btn btn-block" href="entries">Open my journal</a>
+                <button class="btn btn-ghost btn-block" @onclick="SignOut">Sign out</button>
+            </div>
         }
         else if (_sent)
         {
@@ -59,6 +119,58 @@
     private string _email = "";
     private string? _error;
     private bool _busy, _sent;
+
+    private bool _statsLoading = true;
+    private bool _statsError;
+    private int? _savedCount;
+    private int _shoutCount;
+    private int _streak;
+
+    private record ThemeOption(string Value, string Label, string Icon);
+    private readonly ThemeOption[] _themeOptions =
+    {
+        new(ThemeService.Light, "Light", "☀️"),
+        new(ThemeService.Dark, "Dark", "🌙"),
+        new(ThemeService.System, "System", "🖥️"),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsSignedIn) await LoadStatsAsync();
+    }
+
+    private async Task LoadStatsAsync()
+    {
+        _statsLoading = true;
+        var days = new List<DateOnly>();
+
+        // Shouts are local (count + dates only — never any words).
+        try
+        {
+            var (count, shoutDays) = await Stats.GetShoutsAsync();
+            _shoutCount = count;
+            days.AddRange(shoutDays);
+        }
+        catch { _shoutCount = 0; }
+
+        // Saved entries come from the server as timestamps — no decryption needed.
+        try
+        {
+            var timestamps = await Store.ListEntryTimestampsAsync();
+            _savedCount = timestamps.Count;
+            days.AddRange(timestamps.Select(t => DateOnly.FromDateTime(t.LocalDateTime)));
+        }
+        catch
+        {
+            _savedCount = null; // shown as "—"
+            _statsError = true;
+        }
+
+        _streak = StatsService.CurrentStreak(days);
+        _statsLoading = false;
+    }
+
+    private async Task SetTheme(string preference) => await Theme.SetAsync(preference);
 
     private async Task Send()
     {

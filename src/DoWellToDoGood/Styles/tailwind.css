@@ -97,6 +97,64 @@
     --color-brand-green: #5e9e6a;
 }
 
+/* =====================================================================
+   Dark theme.
+   A small JS bootstrap resolves the saved preference (light / dark /
+   system) to an *effective* theme and sets data-theme="light|dark" on
+   <html> before first paint, so "system" is already collapsed to a
+   concrete value here — this block only needs to override the light
+   tokens. Every foreground/background pair below was checked against
+   WCAG 2.2: all body text meets AA (≥4.5:1) and UI borders/focus meet
+   the 3:1 non-text minimum.
+   ===================================================================== */
+html[data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-bg: #0e1620;
+    --color-surface: #182532;
+    --color-surface-2: #1f2e3d;
+    --color-sunken: #121b25;
+
+    --color-ink: #eaf1f7;
+    --color-muted: #aebfcd;
+
+    --color-line: #2a3a4a;
+    --color-line-strong: #5a7790;
+
+    --color-primary: #4fbcd1;
+    --color-primary-hover: #6fcbdd;
+    --color-primary-soft: #18323d;
+    --color-secondary: #9b8ff0;
+    --color-secondary-hover: #b1a6f7;
+    --color-secondary-soft: #272142;
+    --color-link: #5cc6da;
+    --color-link-hover: #7fd6e7;
+    --color-focus: #6cb0ff;
+    --color-danger: #f3938a;
+    --color-success: #62c78f;
+}
+
+/* Filled controls flip from white-on-teal (light) to dark-ink-on-bright
+   accents (dark) so the label still clears AA on the brighter surfaces. */
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .btn-secondary,
+html[data-theme="dark"] .nav-link.active {
+    color: #06222b;
+}
+
+html[data-theme="dark"] body {
+    background-image:
+        radial-gradient(1200px 800px at 12% -10%, #181a2e, transparent 60%),
+        radial-gradient(1000px 700px at 100% 0%, #0d2530, transparent 55%),
+        linear-gradient(180deg, #101b26, var(--color-bg));
+}
+
+html[data-theme="dark"] #blazor-error-ui {
+    background: #3a2f1a;
+    border-top-color: #c08a2b;
+    color: var(--color-ink);
+}
+
 /* ===================== Brand wordmark (logo typeset) ===================== */
 .brand-word {
     font-family: "Quicksand", ui-rounded, "Segoe UI", system-ui, sans-serif;
@@ -109,6 +167,7 @@
 
 /* ===================== Base ===================== */
 @layer base {
+    html { color-scheme: light; }
     html, body { height: 100%; }
 
     body {
@@ -213,6 +272,47 @@
     .chip:hover { @apply -translate-y-px; box-shadow: var(--shadow-soft-sm); }
     .chip.is-selected { box-shadow: inset 0 0 0 2px var(--chip), 0 0 0 3px var(--chip-soft); }
     .chip.is-selected::before { content: "✓ "; @apply font-extrabold; }
+
+    /* Translucent header/footer chrome that tracks the surface token, so the
+       bars frost correctly in both light and dark instead of a baked-in white. */
+    .app-bar { background: color-mix(in srgb, var(--color-surface) 78%, transparent); }
+    .app-bar--soft { background: color-mix(in srgb, var(--color-surface) 55%, transparent); }
+
+    /* Segmented control — built on real radio inputs (kept visually hidden) so
+       it gets native radiogroup semantics and arrow-key navigation for free. */
+    .segmented {
+        @apply flex gap-0 rounded-full p-1 m-0;
+        background: var(--color-sunken);
+        border: 1.5px solid var(--color-line-strong);
+    }
+    .segmented-option {
+        @apply flex-1 inline-flex items-center justify-center gap-2 min-h-[2.6rem] px-3 py-2 rounded-full font-semibold cursor-pointer transition;
+        color: var(--color-muted);
+    }
+    .segmented-option:hover { color: var(--color-ink); }
+    .segmented-option:has(input:checked) {
+        background: var(--color-surface);
+        color: var(--color-ink);
+        box-shadow: var(--shadow-soft-sm);
+    }
+    .segmented-option:has(input:focus-visible) {
+        outline: 3px solid var(--color-focus);
+        outline-offset: 2px;
+    }
+
+    /* Stat tiles for the account summary */
+    .stat {
+        @apply flex flex-col items-center gap-1 rounded-bubble px-2 py-4 text-center;
+        background: var(--color-surface-2);
+        border: 1px solid var(--color-line);
+    }
+    .stat-num {
+        font-family: "Quicksand", ui-rounded, "Segoe UI", system-ui, sans-serif;
+        @apply font-extrabold leading-none;
+        font-size: clamp(1.5rem, 1rem + 2.4vw, 2rem);
+        color: var(--color-primary);
+    }
+    .stat-label { @apply text-xs font-semibold; color: var(--color-muted); line-height: 1.25; }
 }
 
 /* ===================== Emotion wheel ===================== */
@@ -236,7 +336,7 @@
     filter: brightness(1.06) drop-shadow(0 0 7px rgba(20, 32, 42, 0.45));
 }
 
-.wheel-hub { fill: #ffffff; stroke: var(--color-line); stroke-width: 2; }
+.wheel-hub { fill: var(--color-surface); stroke: var(--color-line); stroke-width: 2; }
 
 .wheel-labels { position: absolute; inset: 0; pointer-events: none; }
 .wheel-label {

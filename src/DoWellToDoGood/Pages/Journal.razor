@@ -6,6 +6,7 @@
 @inject CryptoService Crypto
 @inject EntriesService Entries
 @inject TipHistoryService TipHistory
+@inject StatsService Stats
 
 <PageTitle>Write — Do Well to Do Good</PageTitle>
 
@@ -175,6 +176,9 @@
         if (!CanSubmit) return;
 
         _tip = await PickTipAsync();
+
+        // Count the release (a number and a date only — never the words themselves).
+        await Stats.RecordShoutAsync();
 
         // Release: nothing is persisted — just clear everything from memory.
         _emotion = string.Empty;
