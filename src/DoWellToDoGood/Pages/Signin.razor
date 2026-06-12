@@ -35,7 +35,7 @@
                         </div>
                         <div class="stat">
                             <span class="stat-num">@_shoutCount</span>
-                            <span class="stat-label">Shouted into the wind</span>
+                            <span class="stat-label">Shouted into the wind (from this device)</span>
                         </div>
                         <div class="stat">
                             <span class="stat-num">@(_streak > 0 ? $"🔥 {_streak}" : "0")</span>
@@ -69,7 +69,6 @@
                         </label>
                     }
                 </fieldset>
-                <p class="hint">“System” follows your device. Dark mode meets the same AA contrast standards as light.</p>
             </section>
 
             <div class="space-y-3">
@@ -82,7 +81,7 @@
         {
             <h1 class="text-center">Check your email</h1>
             <p class="text-muted text-center">
-                We sent a one-time sign-in link to <strong>@_email</strong>. Open it on this device
+                We sent a one-time sign-in link from Supabase to <strong>@_email</strong>. Open it on this device
                 and you'll land back here, signed in.
             </p>
             <p class="text-muted text-sm text-center">It can take a minute to arrive. Check spam if it's shy.</p>
