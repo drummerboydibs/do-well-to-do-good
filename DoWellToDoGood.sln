@@ -7,6 +7,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{78ECF99B-04F
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DoWellToDoGood", "src\DoWellToDoGood\DoWellToDoGood.csproj", "{CB0DDC2A-C246-43D5-9C16-BBFD51B4A7D4}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{2C4F2A3E-7B6D-4E1A-9C0F-1B2A3C4D5E6F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DoWellToDoGood.Tests", "tests\DoWellToDoGood.Tests\DoWellToDoGood.Tests.csproj", "{D7E8F9A0-1B2C-4D3E-8F90-A1B2C3D4E5F6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,8 +24,13 @@ Global
 		{CB0DDC2A-C246-43D5-9C16-BBFD51B4A7D4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CB0DDC2A-C246-43D5-9C16-BBFD51B4A7D4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CB0DDC2A-C246-43D5-9C16-BBFD51B4A7D4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7E8F9A0-1B2C-4D3E-8F90-A1B2C3D4E5F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7E8F9A0-1B2C-4D3E-8F90-A1B2C3D4E5F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7E8F9A0-1B2C-4D3E-8F90-A1B2C3D4E5F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7E8F9A0-1B2C-4D3E-8F90-A1B2C3D4E5F6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{CB0DDC2A-C246-43D5-9C16-BBFD51B4A7D4} = {78ECF99B-04F3-45AC-ADEE-4D7659EDC46A}
+		{D7E8F9A0-1B2C-4D3E-8F90-A1B2C3D4E5F6} = {2C4F2A3E-7B6D-4E1A-9C0F-1B2A3C4D5E6F}
 	EndGlobalSection
 EndGlobal

@@ -131,15 +131,26 @@ public class AuthService(IJSRuntime js, NavigationManager nav)
     {
         Email = UserId = null;
         if (AccessToken is null) return;
+        (Email, UserId) = DecodeClaims(AccessToken);
+    }
+
+    /// <summary>
+    /// Pull the display-only "email" and "sub" claims out of a JWT's payload
+    /// (base64url, unverified — the server verifies the token itself). Returns
+    /// nulls for anything malformed rather than throwing.
+    /// </summary>
+    internal static (string? Email, string? UserId) DecodeClaims(string accessToken)
+    {
         try
         {
-            var payload = AccessToken.Split('.')[1].Replace('-', '+').Replace('_', '/');
+            var payload = accessToken.Split('.')[1].Replace('-', '+').Replace('_', '/');
             payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
             using var doc = JsonDocument.Parse(Convert.FromBase64String(payload));
-            if (doc.RootElement.TryGetProperty("email", out var e)) Email = e.GetString();
-            if (doc.RootElement.TryGetProperty("sub", out var s)) UserId = s.GetString();
+            var email = doc.RootElement.TryGetProperty("email", out var e) ? e.GetString() : null;
+            var userId = doc.RootElement.TryGetProperty("sub", out var s) ? s.GetString() : null;
+            return (email, userId);
         }
-        catch { /* claims are display-only; the server verifies the token itself */ }
+        catch { return (null, null); }
     }
 
     private async Task PersistAsync()
@@ -148,13 +159,13 @@ public class AuthService(IJSRuntime js, NavigationManager nav)
         await js.InvokeVoidAsync("localStorage.setItem", StorageKey, json);
     }
 
-    private static Dictionary<string, string> ParseFragment(string fragment) =>
+    internal static Dictionary<string, string> ParseFragment(string fragment) =>
         fragment.Split('&', StringSplitOptions.RemoveEmptyEntries)
             .Select(kv => kv.Split('=', 2))
             .Where(p => p.Length == 2)
             .ToDictionary(p => p[0], p => Uri.UnescapeDataString(p[1]));
 
-    private static string? ExtractError(string body)
+    internal static string? ExtractError(string body)
     {
         try
         {
