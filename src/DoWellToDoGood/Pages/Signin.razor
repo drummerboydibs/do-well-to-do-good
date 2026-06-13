@@ -18,6 +18,19 @@
             <div class="space-y-1">
                 <h1 class="text-center">Account</h1>
                 <p class="text-muted text-center m-0">@Auth.Email</p>
+                @if (_createdAt.HasValue || _lastSignIn.HasValue)
+                {
+                    <div class="flex flex-col items-center gap-0.5">
+                        @if (_createdAt.HasValue)
+                        {
+                            <p class="text-xs text-muted m-0">Member since @_createdAt.Value.ToLocalTime().ToString("MMMM d, yyyy")</p>
+                        }
+                        @if (_lastSignIn.HasValue)
+                        {
+                            <p class="text-xs text-muted m-0">Last login @_lastSignIn.Value.ToLocalTime().ToString("MMM d, yyyy 'at' h:mm tt")</p>
+                        }
+                    </div>
+                }
             </div>
 
             <section aria-labelledby="stats-heading" class="space-y-3">
@@ -55,26 +68,28 @@
                 }
             </section>
 
-            <section aria-labelledby="appearance-heading" class="space-y-2">
-                <h2 id="appearance-heading" class="text-base font-bold m-0">Appearance</h2>
-                <fieldset class="segmented">
-                    <legend class="sr-only">Color theme</legend>
-                    @foreach (var opt in _themeOptions)
-                    {
-                        <label class="segmented-option">
-                            <input type="radio" name="theme" class="sr-only" value="@opt.Value"
-                                   checked="@(Theme.Current == opt.Value)"
-                                   @onchange="() => SetTheme(opt.Value)" />
-                            <span aria-hidden="true">@opt.Icon</span> @opt.Label
-                        </label>
-                    }
-                </fieldset>
-            </section>
-
             <div class="space-y-3">
-                <a class="btn btn-primary btn-block" href="journal">Start writing</a>
-                <a class="btn btn-block" href="entries">Open my journal</a>
-                <button class="btn btn-ghost btn-block" @onclick="SignOut">Sign out</button>
+                <section aria-labelledby="appearance-heading" class="space-y-2">
+                    <h2 id="appearance-heading" class="text-base font-bold m-0">Appearance</h2>
+                    <fieldset class="segmented">
+                        <legend class="sr-only">Color theme</legend>
+                        @foreach (var opt in _themeOptions)
+                        {
+                            <label class="segmented-option">
+                                <input type="radio" name="theme" class="sr-only" value="@opt.Value"
+                                       checked="@(Theme.Current == opt.Value)"
+                                       @onchange="() => SetTheme(opt.Value)" />
+                                <span aria-hidden="true">@opt.Icon</span> @opt.Label
+                            </label>
+                        }
+                    </fieldset>
+                </section>
+
+                <div class="space-y-3">
+                    <a class="btn btn-primary btn-block" href="journal">Start writing</a>
+                    <a class="btn btn-block" href="entries">Open my journal</a>
+                    <button class="btn btn-ghost btn-block" @onclick="SignOut">Sign out</button>
+                </div>
             </div>
         }
         else if (_sent)
@@ -124,6 +139,8 @@
     private int? _savedCount;
     private int _shoutCount;
     private int _streak;
+    private DateTimeOffset? _createdAt;
+    private DateTimeOffset? _lastSignIn;
 
     private record ThemeOption(string Value, string Label, string Icon);
     private readonly ThemeOption[] _themeOptions =
@@ -166,6 +183,10 @@
         }
 
         _streak = StatsService.CurrentStreak(days);
+
+        try { (_createdAt, _lastSignIn) = await Auth.GetUserMetaAsync(); }
+        catch { }
+
         _statsLoading = false;
     }
 
