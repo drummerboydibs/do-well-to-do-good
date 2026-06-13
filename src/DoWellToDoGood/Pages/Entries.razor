@@ -9,7 +9,18 @@
 <PageTitle>My journal — Do Well to Do Good</PageTitle>
 
 <div class="mx-auto max-w-3xl px-6 space-y-6">
-    <h1>My journal</h1>
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+        <h1 class="m-0">My journal</h1>
+        @if (Auth.IsSignedIn)
+        {
+            <a class="btn btn-primary" href="journal">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 20h4L19 9a2.5 2.5 0 0 0-3.5-3.5L4 16.5V20z" /><path d="M14 6.5l3.5 3.5" />
+                </svg>
+                Write
+            </a>
+        }
+    </div>
 
     @if (!Auth.IsSignedIn)
     {
@@ -26,7 +37,7 @@
     {
         <p class="text-muted" role="status">Decrypting your entries…</p>
     }
-    else if (_entries.Count == 0)
+    else if (_total == 0)
     {
         <div class="card text-center space-y-4">
             <p class="text-muted m-0">Nothing saved yet. Your story starts whenever you're ready.</p>
@@ -36,7 +47,7 @@
     else
     {
         <p class="text-muted">
-            @_entries.Count saved @(_entries.Count == 1 ? "entry" : "entries"), newest first.
+            @_total saved @(_total == 1 ? "entry" : "entries"), newest first.
         </p>
         <div class="space-y-4">
             @foreach (var e in _entries)
@@ -54,11 +65,41 @@
                 </article>
             }
         </div>
+
+        @if (_total > PageSize)
+        {
+            <nav class="flex items-center justify-center gap-3 flex-wrap" aria-label="Journal pages">
+                <button class="btn" disabled="@(_page <= 1)" @onclick="() => GoToPage(_page - 1)" aria-label="Show newer entries">
+                    <span aria-hidden="true">←</span> Newer
+                </button>
+                <span class="text-muted text-sm" aria-live="polite">Page @_page of @Pagination.TotalPages(_total, PageSize)</span>
+                <button class="btn" disabled="@(_page >= Pagination.TotalPages(_total, PageSize))" @onclick="() => GoToPage(_page + 1)" aria-label="Show older entries">
+                    Older <span aria-hidden="true">→</span>
+                </button>
+            </nav>
+        }
+
+        @* A gentle nudge at the end of the list, so finishing a read flows
+           straight into writing without scrolling back to the header button. *@
+        <a href="journal" class="card-soft flex items-center justify-between gap-4 no-underline"
+           style="background:linear-gradient(180deg, var(--color-primary-soft), var(--color-surface-2) 85%)">
+            <span class="min-w-0">
+                <span class="block font-semibold" style="color:var(--color-ink)">What's on your mind today?</span>
+                <span class="block text-muted text-sm">Start a new entry — saved privately, just for you.</span>
+            </span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--color-primary); flex-shrink:0">
+                <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+            </svg>
+        </a>
     }
 </div>
 
 @code {
+    private const int PageSize = 10;
+
     private bool _loading;
+    private int _page = 1;
+    private int _total;
     private List<DecryptedEntry> _entries = new();
 
     private record DecryptedEntry(Guid Id, string Body, string Emotion, DateTimeOffset CreatedAt, string Tint);
@@ -68,32 +109,27 @@
         if (Auth.IsSignedIn && Crypto.IsUnlocked) await Load();
     }
 
-    private async Task Load()
+    private Task Load() => LoadPage(1);
+
+    private async Task LoadPage(int page)
     {
         _loading = true;
         StateHasChanged();
         try
         {
-            var rows = await Store.ListEntriesAsync();
-            var list = new List<DecryptedEntry>();
-            foreach (var row in rows)
+            var pageData = await Store.ListEntriesPageAsync((page - 1) * PageSize, PageSize);
+            _total = pageData.Total;
+
+            // A deletion can leave us past the last page; fall back to the new last one.
+            var lastPage = Pagination.TotalPages(_total, PageSize);
+            if (page > lastPage)
             {
-                string body, emotion = "";
-                try
-                {
-                    var json = await Crypto.DecryptAsync(row.Payload);
-                    using var doc = JsonDocument.Parse(json);
-                    body = doc.RootElement.GetProperty("body").GetString() ?? "";
-                    emotion = doc.RootElement.TryGetProperty("emotion", out var em) ? em.GetString() ?? "" : "";
-                }
-                catch
-                {
-                    body = "⚠ This entry couldn't be decrypted with the current key.";
-                }
-                var valence = EmotionCatalog.Find(emotion)?.Valence ?? 0;
-                list.Add(new(row.Id, body, emotion, row.CreatedAt, Tint(valence)));
+                await LoadPage(lastPage);
+                return;
             }
-            _entries = list;
+
+            _page = page;
+            _entries = await DecryptAsync(pageData.Rows);
         }
         finally
         {
@@ -101,12 +137,45 @@
         }
     }
 
+    private async Task GoToPage(int page)
+    {
+        await LoadPage(Pagination.ClampPage(page, _total, PageSize));
+        await JS.InvokeVoidAsync("scrollTo", 0, 0); // start each page at the top of the list
+    }
+
+    // Decrypt one page worth of rows. A row that won't decrypt with the current
+    // key is shown with a placeholder rather than failing the whole page.
+    private async Task<List<DecryptedEntry>> DecryptAsync(IReadOnlyList<EntriesService.EntryRow> rows)
+    {
+        var list = new List<DecryptedEntry>();
+        foreach (var row in rows)
+        {
+            string body, emotion = "";
+            try
+            {
+                var json = await Crypto.DecryptAsync(row.Payload);
+                using var doc = JsonDocument.Parse(json);
+                body = doc.RootElement.GetProperty("body").GetString() ?? "";
+                emotion = doc.RootElement.TryGetProperty("emotion", out var em) ? em.GetString() ?? "" : "";
+            }
+            catch
+            {
+                body = "⚠ This entry couldn't be decrypted with the current key.";
+            }
+            var valence = EmotionCatalog.Find(emotion)?.Valence ?? 0;
+            list.Add(new(row.Id, body, emotion, row.CreatedAt, Tint(valence)));
+        }
+        return list;
+    }
+
     private async Task Delete(Guid id)
     {
         if (!await JS.InvokeAsync<bool>("confirm", "Delete this entry forever? This can't be undone."))
             return;
         await Store.DeleteEntryAsync(id);
-        _entries.RemoveAll(e => e.Id == id);
+        // Re-fetch the current page so the freed slot fills from the next page and
+        // the total stays accurate (LoadPage clamps if this emptied the last page).
+        await LoadPage(_page);
     }
 
     // Valence (-1..+1) → an accent hex along calm-blue (positive) ← lavender-grey
