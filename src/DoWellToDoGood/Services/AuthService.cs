@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components;
@@ -112,6 +113,11 @@ public class AuthService(IJSRuntime js, NavigationManager nav)
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// Fetches account timestamps (joined date, last sign-in) from GoTrue's
+    /// /user endpoint for the Account page. Returns nulls on any failure so the
+    /// UI simply omits the lines rather than erroring.
+    /// </summary>
     public async Task<(DateTimeOffset? CreatedAt, DateTimeOffset? LastSignIn)> GetUserMetaAsync()
     {
         if (AccessToken is null) return (null, null);
@@ -121,18 +127,31 @@ public class AuthService(IJSRuntime js, NavigationManager nav)
             req.Headers.Add("Authorization", $"Bearer {AccessToken}");
             using var res = await _http.SendAsync(req);
             if (!res.IsSuccessStatusCode) return (null, null);
-            using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-            DateTimeOffset? createdAt = null, lastSignIn = null;
-            if (root.TryGetProperty("created_at", out var ca) && ca.GetString() is { } caStr
-                && DateTimeOffset.TryParse(caStr, out var caVal))
-                createdAt = caVal;
-            if (root.TryGetProperty("last_sign_in_at", out var ls) && ls.GetString() is { } lsStr
-                && DateTimeOffset.TryParse(lsStr, out var lsVal))
-                lastSignIn = lsVal;
-            return (createdAt, lastSignIn);
+            return ParseUserMeta(await res.Content.ReadAsStringAsync());
         }
         catch { return (null, null); }
+    }
+
+    /// <summary>
+    /// Pull the "created_at" and "last_sign_in_at" timestamps out of a GoTrue
+    /// /user response. Either is null if it's absent or unparseable; a malformed
+    /// body yields (null, null) rather than throwing.
+    /// </summary>
+    internal static (DateTimeOffset? CreatedAt, DateTimeOffset? LastSignIn) ParseUserMeta(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            return (ReadTimestamp(root, "created_at"), ReadTimestamp(root, "last_sign_in_at"));
+        }
+        catch { return (null, null); }
+
+        static DateTimeOffset? ReadTimestamp(JsonElement root, string name) =>
+            root.TryGetProperty(name, out var el) && el.GetString() is { } s
+                && DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var v)
+                ? v
+                : null;
     }
 
     private static HttpRequestMessage NewReq(HttpMethod method, string url)

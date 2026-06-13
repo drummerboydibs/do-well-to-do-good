@@ -42,7 +42,7 @@
             @foreach (var e in _entries)
             {
                 <article class="rounded-bubble-lg border border-line shadow-soft-sm p-5"
-                         style="border-left:6px solid @e.Tint; background:linear-gradient(180deg, @e.TintSoft, var(--color-surface) 70%)">
+                         style="border-left:6px solid @e.Tint; background:linear-gradient(180deg, color-mix(in srgb, @e.Tint 14%, var(--color-surface)), var(--color-surface) 70%)">
                     <header class="flex justify-between items-baseline gap-3 mb-2 flex-wrap">
                         <span class="font-bold">@(string.IsNullOrWhiteSpace(e.Emotion) ? "Unnamed feeling" : e.Emotion)</span>
                         <span class="text-muted text-xs">@e.CreatedAt.LocalDateTime.ToString("ddd, MMM d yyyy · h:mm tt")</span>
@@ -61,7 +61,7 @@
     private bool _loading;
     private List<DecryptedEntry> _entries = new();
 
-    private record DecryptedEntry(Guid Id, string Body, string Emotion, DateTimeOffset CreatedAt, string Tint, string TintSoft);
+    private record DecryptedEntry(Guid Id, string Body, string Emotion, DateTimeOffset CreatedAt, string Tint);
 
     protected override async Task OnInitializedAsync()
     {
@@ -91,7 +91,7 @@
                     body = "⚠ This entry couldn't be decrypted with the current key.";
                 }
                 var valence = EmotionCatalog.Find(emotion)?.Valence ?? 0;
-                list.Add(new(row.Id, body, emotion, row.CreatedAt, Tint(valence), TintSoft(valence)));
+                list.Add(new(row.Id, body, emotion, row.CreatedAt, Tint(valence)));
             }
             _entries = list;
         }
@@ -109,9 +109,11 @@
         _entries.RemoveAll(e => e.Id == id);
     }
 
-    // Valence (-1..+1) → hex color along warm-red ← lavender-grey → calm-blue.
+    // Valence (-1..+1) → an accent hex along calm-blue (positive) ← lavender-grey
+    // (neutral) → warm-coral (negative). Used for the card's left rule and, mixed
+    // into the surface token via color-mix, a faint wash that holds up in both
+    // light and dark themes.
     private static string Tint(double v) => Lerp(v, (0x5b, 0xa6, 0xdd), (0xbc, 0xb6, 0xd4), (0xe0, 0x7a, 0x64));
-    private static string TintSoft(double v) => Lerp(v, (0xd9, 0xeb, 0xf9), (0xe8, 0xe4, 0xf1), (0xf8, 0xe1, 0xd9));
 
     private static string Lerp(double v, (int R, int G, int B) pos, (int R, int G, int B) neutral, (int R, int G, int B) neg)
     {

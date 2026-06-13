@@ -109,4 +109,69 @@ public class AuthServiceParsingTests
         Assert.Null(email);
         Assert.Null(userId);
     }
+
+    // ---- ParseUserMeta ----
+
+    [Fact]
+    public void ParseUserMeta_ReadsBothTimestamps()
+    {
+        var json = "{\"created_at\":\"2024-01-05T08:30:00Z\",\"last_sign_in_at\":\"2026-06-12T15:45:00Z\"}";
+
+        var (createdAt, lastSignIn) = AuthService.ParseUserMeta(json);
+
+        Assert.Equal(DateTimeOffset.Parse("2024-01-05T08:30:00Z"), createdAt);
+        Assert.Equal(DateTimeOffset.Parse("2026-06-12T15:45:00Z"), lastSignIn);
+    }
+
+    [Fact]
+    public void ParseUserMeta_PreservesUtcInstant_RegardlessOfMachineTimeZone()
+    {
+        // GoTrue returns UTC ("Z"); the parsed instant must equal that UTC moment
+        // no matter what the test host's local zone is (the UI does ToLocalTime()).
+        var (createdAt, _) = AuthService.ParseUserMeta("{\"created_at\":\"2024-01-05T08:30:00Z\"}");
+
+        Assert.NotNull(createdAt);
+        Assert.Equal(new DateTimeOffset(2024, 1, 5, 8, 30, 0, TimeSpan.Zero), createdAt!.Value.ToUniversalTime());
+    }
+
+    [Fact]
+    public void ParseUserMeta_MissingFields_AreNull()
+    {
+        var (createdAt, lastSignIn) = AuthService.ParseUserMeta("{\"email\":\"jane@example.com\"}");
+
+        Assert.Null(createdAt);
+        Assert.Null(lastSignIn);
+    }
+
+    [Fact]
+    public void ParseUserMeta_PartialFields_FillWhatItCan()
+    {
+        var (createdAt, lastSignIn) = AuthService.ParseUserMeta("{\"created_at\":\"2024-01-05T08:30:00Z\"}");
+
+        Assert.NotNull(createdAt);
+        Assert.Null(lastSignIn);
+    }
+
+    [Theory]
+    [InlineData("{\"created_at\":\"not-a-date\"}")]
+    [InlineData("{\"created_at\":null}")]
+    [InlineData("{\"created_at\":12345}")]
+    public void ParseUserMeta_UnparseableTimestamp_IsNull(string json)
+    {
+        var (createdAt, _) = AuthService.ParseUserMeta(json);
+
+        Assert.Null(createdAt);
+    }
+
+    [Theory]
+    [InlineData("not json at all")]
+    [InlineData("")]
+    [InlineData("[1,2,3]")]
+    public void ParseUserMeta_MalformedBody_ReturnsNulls(string json)
+    {
+        var (createdAt, lastSignIn) = AuthService.ParseUserMeta(json);
+
+        Assert.Null(createdAt);
+        Assert.Null(lastSignIn);
+    }
 }
