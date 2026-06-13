@@ -112,6 +112,29 @@ public class AuthService(IJSRuntime js, NavigationManager nav)
         Changed?.Invoke();
     }
 
+    public async Task<(DateTimeOffset? CreatedAt, DateTimeOffset? LastSignIn)> GetUserMetaAsync()
+    {
+        if (AccessToken is null) return (null, null);
+        try
+        {
+            using var req = NewReq(HttpMethod.Get, $"{SupabaseConfig.Url}/auth/v1/user");
+            req.Headers.Add("Authorization", $"Bearer {AccessToken}");
+            using var res = await _http.SendAsync(req);
+            if (!res.IsSuccessStatusCode) return (null, null);
+            using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+            var root = doc.RootElement;
+            DateTimeOffset? createdAt = null, lastSignIn = null;
+            if (root.TryGetProperty("created_at", out var ca) && ca.GetString() is { } caStr
+                && DateTimeOffset.TryParse(caStr, out var caVal))
+                createdAt = caVal;
+            if (root.TryGetProperty("last_sign_in_at", out var ls) && ls.GetString() is { } lsStr
+                && DateTimeOffset.TryParse(lsStr, out var lsVal))
+                lastSignIn = lsVal;
+            return (createdAt, lastSignIn);
+        }
+        catch { return (null, null); }
+    }
+
     private static HttpRequestMessage NewReq(HttpMethod method, string url)
     {
         var req = new HttpRequestMessage(method, url);
