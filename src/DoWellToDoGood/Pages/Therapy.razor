@@ -1,0 +1,505 @@
+@page "/therapy"
+@using System.Text.Json
+@using DoWellToDoGood.Services
+@inject AuthService Auth
+@inject CryptoService Crypto
+@inject TherapyService Svc
+@inject IJSRuntime JS
+
+<PageTitle>Therapy &amp; goals — Do Well to Do Good</PageTitle>
+
+@* Open-goal card template (declared before use). *@
+@{
+    RenderFragment<GoalVm> GoalCard = g =>
+    @<article class="card space-y-3">
+        @if (g.Editing)
+        {
+            <div class="field m-0">
+                <label class="label" for="edit-title-@g.Id">Goal</label>
+                <input id="edit-title-@g.Id" class="input" type="text" maxlength="200" @bind="g.EditTitle" />
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <label class="text-sm text-muted" for="edit-end-@g.Id">Target date</label>
+                <input id="edit-end-@g.Id" class="input !min-h-0 py-1 w-auto" type="date" @bind="g.EditEnd" />
+                @if (g.EditEnd is not null)
+                {
+                    <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => g.EditEnd = null">Clear date</button>
+                }
+            </div>
+            <div class="flex gap-2">
+                <button class="btn btn-primary !min-h-0 py-2" @onclick="() => SaveEdit(g)">Save</button>
+                <button class="btn btn-ghost !min-h-0 py-2" @onclick="() => g.Editing = false">Cancel</button>
+            </div>
+        }
+        else
+        {
+            <header class="flex justify-between items-start gap-3 flex-wrap">
+                <div>
+                    <h3 class="m-0">@g.Title</h3>
+                    @if (g.End is not null)
+                    {
+                        <p class="text-sm m-0 mt-1 @(IsOverdue(g) ? "font-semibold" : "text-muted")"
+                           style="@(IsOverdue(g) ? "color:var(--color-danger)" : "")">
+                            @(IsOverdue(g) ? "⚠ Was due " : "Target: ")@FormatDate(g.End.Value)
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="text-sm text-muted m-0 mt-1">No end date</p>
+                    }
+                </div>
+                <div class="flex gap-2">
+                    <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => StartEdit(g)">Edit</button>
+                    <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => SetDone(g, true)">Mark done</button>
+                    <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteGoal(g)">Delete</button>
+                </div>
+            </header>
+
+            @if (g.Progress.Count > 0)
+            {
+                <ul class="space-y-2 m-0 pl-0" style="list-style:none">
+                    @foreach (var p in g.Progress)
+                    {
+                        <li class="rounded-bubble bg-surface-2 border border-line p-3">
+                            <div class="flex justify-between items-baseline gap-2 flex-wrap">
+                                <span class="text-xs text-muted">@FormatDate(p.Date)</span>
+                                <button class="btn btn-ghost text-xs !min-h-0 !py-0.5 !px-1.5" @onclick="() => DeleteProgress(g, p)">Remove</button>
+                            </div>
+                            <p class="m-0 mt-1 whitespace-pre-wrap">@p.Note</p>
+                        </li>
+                    }
+                </ul>
+            }
+
+            <div class="card-soft space-y-2">
+                <label class="label text-sm m-0" for="prog-@g.Id">Log progress</label>
+                <textarea id="prog-@g.Id" class="textarea !min-h-[4rem]" rows="2" maxlength="5000"
+                          placeholder="What happened? e.g. Introduced myself to a stranger named Sarah." @bind="g.DraftNote"></textarea>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <input class="input !min-h-0 py-1 w-auto" type="date" max="@_today" @bind="g.DraftDate" />
+                    <button class="btn btn-primary !min-h-0 py-2" disabled="@string.IsNullOrWhiteSpace(g.DraftNote)" @onclick="() => AddProgress(g)">Add</button>
+                </div>
+            </div>
+        }
+    </article>;
+}
+
+<div class="mx-auto max-w-3xl px-6 space-y-6">
+    <h1>Therapy &amp; goals</h1>
+
+    @if (!Auth.IsSignedIn)
+    {
+        <div class="card text-center space-y-4">
+            <p class="text-muted m-0">Sign in to log therapy sessions and track goals — encrypted so only you can read them.</p>
+            <a class="btn btn-primary" href="signin">Sign in</a>
+        </div>
+    }
+    else if (!Crypto.IsUnlocked)
+    {
+        <VaultGate OnUnlocked="Load" />
+    }
+    else if (_loading)
+    {
+        <p class="text-muted" role="status">Decrypting your sessions and goals…</p>
+    }
+    else
+    {
+        @* ---------- Log a session ---------- *@
+        <section class="card space-y-4" aria-labelledby="log-h">
+            <h2 id="log-h" class="m-0">Log a therapy session</h2>
+
+            <div class="field">
+                <label class="label" for="s-date">Session date</label>
+                <input id="s-date" class="input" type="date" max="@_today" @bind="_sessionDate" />
+            </div>
+
+            <div class="field">
+                <label class="label" for="s-notes">Session notes</label>
+                <textarea id="s-notes" class="textarea" rows="5" maxlength="20000" @bind="_sessionNotes"
+                          placeholder="What came up, what helped, anything you want to remember…"></textarea>
+            </div>
+
+            <div class="space-y-3">
+                <p class="label m-0">Goals from this session <span class="text-muted font-normal">(optional, up to 4)</span></p>
+                @for (int i = 0; i < _goalDrafts.Count; i++)
+                {
+                    var d = _goalDrafts[i];
+                    <div class="card-soft space-y-2">
+                        <div class="flex justify-between items-center gap-2">
+                            <span class="font-semibold text-sm">Goal @(i + 1)</span>
+                            <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => RemoveGoalDraft(d)">Remove</button>
+                        </div>
+                        <input class="input" type="text" maxlength="200" placeholder="e.g. Introduce yourself to two strangers" @bind="d.Title" />
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <label class="text-sm text-muted" for="g-end-@i">Target date (optional)</label>
+                            <input id="g-end-@i" class="input !min-h-0 py-1 w-auto" type="date" min="@_today" @bind="d.End" />
+                            @if (d.End is not null)
+                            {
+                                <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => d.End = null">Clear date</button>
+                            }
+                        </div>
+                    </div>
+                }
+                @if (_goalDrafts.Count < 4)
+                {
+                    <button type="button" class="btn !min-h-0 py-2" @onclick="AddGoalDraft">+ Add a goal</button>
+                }
+            </div>
+
+            @if (_sessionError is not null)
+            {
+                <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_sessionError</p>
+            }
+            @if (_sessionSaved)
+            {
+                <p class="text-sm font-semibold m-0" style="color:var(--color-success)" role="status">Session logged. 🌱</p>
+            }
+            <button class="btn btn-primary" disabled="@_savingSession" @onclick="SaveSession">
+                @(_savingSession ? "Encrypting & saving…" : "Log session")
+            </button>
+        </section>
+
+        @* ---------- Open goals ---------- *@
+        <section class="space-y-4" aria-labelledby="goals-h">
+            <h2 id="goals-h" class="m-0">Open goals</h2>
+            @if (_openGoals.Count == 0)
+            {
+                <div class="card-soft text-muted">No open goals yet. Add one when you log a session above.</div>
+            }
+            @foreach (var g in _openGoals)
+            {
+                @GoalCard(g)
+            }
+        </section>
+
+        @if (_doneGoals.Count > 0)
+        {
+            <details class="card-soft">
+                <summary class="font-semibold cursor-pointer">Completed goals (@_doneGoals.Count)</summary>
+                <div class="space-y-3 mt-3">
+                    @foreach (var g in _doneGoals)
+                    {
+                        <div class="rounded-bubble border border-line p-3 flex justify-between items-center gap-3 flex-wrap">
+                            <span class="line-through text-muted">@g.Title</span>
+                            <span class="flex gap-2">
+                                <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => SetDone(g, false)">Reopen</button>
+                                <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteGoal(g)">Delete</button>
+                            </span>
+                        </div>
+                    }
+                </div>
+            </details>
+        }
+
+        @if (_sessions.Count > 0)
+        {
+            <details class="card-soft">
+                <summary class="font-semibold cursor-pointer">Past sessions (@_sessions.Count)</summary>
+                <div class="space-y-4 mt-3">
+                    @foreach (var s in _sessions)
+                    {
+                        <article class="rounded-bubble border border-line p-4 space-y-2">
+                            <header class="flex justify-between items-baseline gap-3 flex-wrap">
+                                <span class="font-bold">@FormatDate(s.Date)</span>
+                                <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteSession(s)">Delete</button>
+                            </header>
+                            @if (!string.IsNullOrWhiteSpace(s.Notes))
+                            {
+                                <p class="m-0 whitespace-pre-wrap">@s.Notes</p>
+                            }
+                            @if (s.GoalTitles.Count > 0)
+                            {
+                                <p class="text-sm text-muted m-0">Goals set: @string.Join(", ", s.GoalTitles)</p>
+                            }
+                        </article>
+                    }
+                </div>
+            </details>
+        }
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private readonly string _today = DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
+
+    // Log-session form
+    private DateOnly _sessionDate = DateOnly.FromDateTime(DateTime.Today);
+    private string _sessionNotes = "";
+    private readonly List<GoalDraft> _goalDrafts = new() { new() };
+    private bool _savingSession, _sessionSaved;
+    private string? _sessionError;
+
+    private List<GoalVm> _openGoals = new();
+    private List<GoalVm> _doneGoals = new();
+    private List<SessionVm> _sessions = new();
+
+    private sealed class GoalDraft { public string Title = ""; public DateOnly? End; }
+
+    private sealed class GoalVm
+    {
+        public Guid Id;
+        public string Title = "";
+        public DateOnly? End;
+        public bool Done;
+        public DateTimeOffset CreatedAt;
+        public List<ProgressVm> Progress = new();
+        // UI state
+        public bool Editing;
+        public string EditTitle = "";
+        public DateOnly? EditEnd;
+        public string DraftNote = "";
+        public DateOnly DraftDate = DateOnly.FromDateTime(DateTime.Today);
+    }
+
+    private sealed record ProgressVm(Guid Id, string Note, DateOnly Date, DateTimeOffset CreatedAt);
+    private sealed record SessionVm(Guid Id, DateOnly Date, string Notes, List<string> GoalTitles);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsSignedIn && Crypto.IsUnlocked) await Load();
+        else _loading = false;
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var goalRows = await Svc.ListGoalsAsync(openOnly: false);
+            var progressRows = await Svc.ListAllProgressAsync();
+            var sessionRows = await Svc.ListSessionsAsync();
+
+            // Decrypt progress and bucket by goal.
+            var progressByGoal = new Dictionary<Guid, List<ProgressVm>>();
+            foreach (var p in progressRows)
+            {
+                var (note, date) = await DecryptProgress(p.Payload);
+                if (!progressByGoal.TryGetValue(p.GoalId, out var list))
+                    progressByGoal[p.GoalId] = list = new();
+                list.Add(new ProgressVm(p.Id, note, date, p.CreatedAt));
+            }
+
+            // Decrypt goals.
+            var goals = new List<GoalVm>();
+            foreach (var row in goalRows)
+            {
+                var (title, legacyEnd) = await DecryptGoal(row.Payload);
+                goals.Add(new GoalVm
+                {
+                    Id = row.Id,
+                    Title = title,
+                    End = row.EndDate ?? legacyEnd,   // prefer the plaintext column; fall back for legacy goals
+                    Done = row.Done,
+                    CreatedAt = row.CreatedAt,
+                    Progress = progressByGoal.TryGetValue(row.Id, out var pr)
+                        ? pr.OrderByDescending(x => x.CreatedAt).ToList()
+                        : new()
+                });
+            }
+
+            _openGoals = goals.Where(g => !g.Done)
+                .OrderBy(g => g.End ?? DateOnly.MaxValue)
+                .ThenByDescending(g => g.CreatedAt)
+                .ToList();
+            _doneGoals = goals.Where(g => g.Done).OrderByDescending(g => g.CreatedAt).ToList();
+
+            // Decrypt sessions; attach goal titles created from each session.
+            var goalTitleBySession = new Dictionary<Guid, List<string>>();
+            foreach (var row in goalRows)
+            {
+                if (row.SessionId is { } sid)
+                {
+                    var title = goals.First(g => g.Id == row.Id).Title;
+                    if (!goalTitleBySession.TryGetValue(sid, out var l)) goalTitleBySession[sid] = l = new();
+                    l.Add(title);
+                }
+            }
+
+            var sessions = new List<SessionVm>();
+            foreach (var s in sessionRows)
+            {
+                var (date, notes) = await DecryptSession(s.Payload);
+                sessions.Add(new SessionVm(s.Id, date, notes,
+                    goalTitleBySession.TryGetValue(s.Id, out var t) ? t : new()));
+            }
+            _sessions = sessions.OrderByDescending(s => s.Date).ToList();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveSession()
+    {
+        _sessionError = null;
+        _sessionSaved = false;
+        if (string.IsNullOrWhiteSpace(_sessionNotes))
+        {
+            _sessionError = "Add a few notes about the session before logging it.";
+            return;
+        }
+        _savingSession = true;
+        try
+        {
+            var sessionPayload = JsonSerializer.Serialize(new
+            {
+                date = _sessionDate.ToString("yyyy-MM-dd"),
+                notes = _sessionNotes
+            });
+            var blob = await Crypto.EncryptAsync(sessionPayload);
+            var sessionId = await Svc.InsertSessionAsync(blob);
+
+            foreach (var d in _goalDrafts.Where(d => !string.IsNullOrWhiteSpace(d.Title)))
+            {
+                var gblob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { title = d.Title.Trim() }));
+                await Svc.InsertGoalAsync(sessionId, gblob, d.End);
+            }
+
+            _sessionNotes = "";
+            _sessionDate = DateOnly.FromDateTime(DateTime.Today);
+            _goalDrafts.Clear();
+            _goalDrafts.Add(new());
+            _sessionSaved = true;
+            await Load();
+        }
+        catch
+        {
+            _sessionError = "Couldn't save your session. Check your connection and try again.";
+        }
+        finally
+        {
+            _savingSession = false;
+        }
+    }
+
+    private void AddGoalDraft()
+    {
+        if (_goalDrafts.Count < 4) _goalDrafts.Add(new());
+    }
+
+    private void RemoveGoalDraft(GoalDraft d)
+    {
+        _goalDrafts.Remove(d);
+        if (_goalDrafts.Count == 0) _goalDrafts.Add(new());
+    }
+
+    private void StartEdit(GoalVm g)
+    {
+        g.EditTitle = g.Title;
+        g.EditEnd = g.End;
+        g.Editing = true;
+    }
+
+    private async Task SaveEdit(GoalVm g)
+    {
+        if (string.IsNullOrWhiteSpace(g.EditTitle)) return;
+        var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { title = g.EditTitle.Trim() }));
+        await Svc.UpdateGoalAsync(g.Id, blob, g.EditEnd);
+        g.Title = g.EditTitle.Trim();
+        g.End = g.EditEnd;
+        g.Editing = false;
+        ResortOpen();
+    }
+
+    private async Task SetDone(GoalVm g, bool done)
+    {
+        await Svc.SetGoalDoneAsync(g.Id, done);
+        g.Done = done;
+        _openGoals = _openGoals.Where(x => x.Id != g.Id).ToList();
+        _doneGoals = _doneGoals.Where(x => x.Id != g.Id).ToList();
+        if (done) _doneGoals.Insert(0, g);
+        else { _openGoals.Add(g); ResortOpen(); }
+    }
+
+    private async Task DeleteGoal(GoalVm g)
+    {
+        if (!await Confirm("Delete this goal and its progress? This can't be undone.")) return;
+        await Svc.DeleteGoalAsync(g.Id); // progress cascades in the DB
+        _openGoals = _openGoals.Where(x => x.Id != g.Id).ToList();
+        _doneGoals = _doneGoals.Where(x => x.Id != g.Id).ToList();
+    }
+
+    private async Task AddProgress(GoalVm g)
+    {
+        if (string.IsNullOrWhiteSpace(g.DraftNote)) return;
+        var payload = JsonSerializer.Serialize(new
+        {
+            date = g.DraftDate.ToString("yyyy-MM-dd"),
+            note = g.DraftNote.Trim()
+        });
+        var blob = await Crypto.EncryptAsync(payload);
+        await Svc.InsertProgressAsync(g.Id, blob);
+        // Optimistic: show it immediately (server timestamp ~ now).
+        g.Progress.Insert(0, new ProgressVm(Guid.NewGuid(), g.DraftNote.Trim(), g.DraftDate, DateTimeOffset.UtcNow));
+        g.DraftNote = "";
+        g.DraftDate = DateOnly.FromDateTime(DateTime.Today);
+    }
+
+    private async Task DeleteProgress(GoalVm g, ProgressVm p)
+    {
+        await Svc.DeleteProgressAsync(p.Id);
+        g.Progress.Remove(p);
+    }
+
+    private async Task DeleteSession(SessionVm s)
+    {
+        if (!await Confirm("Delete this session? Your goals from it will be kept.")) return;
+        await Svc.DeleteSessionAsync(s.Id);
+        _sessions = _sessions.Where(x => x.Id != s.Id).ToList();
+    }
+
+    private void ResortOpen() => _openGoals = _openGoals
+        .OrderBy(g => g.End ?? DateOnly.MaxValue)
+        .ThenByDescending(g => g.CreatedAt)
+        .ToList();
+
+    private bool IsOverdue(GoalVm g) => g.End is { } e && e < DateOnly.FromDateTime(DateTime.Today);
+
+    private static string FormatDate(DateOnly d) => d.ToString("MMM d, yyyy");
+
+    private Task<bool> Confirm(string message) => JS.InvokeAsync<bool>("confirm", message).AsTask();
+
+    // ---- payload decryption helpers ----
+
+    private async Task<(string Title, DateOnly? End)> DecryptGoal(string payload)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(await Crypto.DecryptAsync(payload));
+            var title = doc.RootElement.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
+            DateOnly? end = doc.RootElement.TryGetProperty("end", out var e) && e.ValueKind == JsonValueKind.String
+                && DateOnly.TryParse(e.GetString(), out var d) ? d : null;
+            return (title, end);
+        }
+        catch { return ("⚠ Couldn't decrypt this goal", null); }
+    }
+
+    private async Task<(string Note, DateOnly Date)> DecryptProgress(string payload)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(await Crypto.DecryptAsync(payload));
+            var note = doc.RootElement.TryGetProperty("note", out var n) ? n.GetString() ?? "" : "";
+            var date = doc.RootElement.TryGetProperty("date", out var dt) && DateOnly.TryParse(dt.GetString(), out var d)
+                ? d : DateOnly.FromDateTime(DateTime.Today);
+            return (note, date);
+        }
+        catch { return ("⚠ Couldn't decrypt this note", DateOnly.FromDateTime(DateTime.Today)); }
+    }
+
+    private async Task<(DateOnly Date, string Notes)> DecryptSession(string payload)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(await Crypto.DecryptAsync(payload));
+            var date = doc.RootElement.TryGetProperty("date", out var dt) && DateOnly.TryParse(dt.GetString(), out var d)
+                ? d : DateOnly.FromDateTime(DateTime.Today);
+            var notes = doc.RootElement.TryGetProperty("notes", out var n) ? n.GetString() ?? "" : "";
+            return (date, notes);
+        }
+        catch { return (DateOnly.FromDateTime(DateTime.Today), "⚠ Couldn't decrypt this session"); }
+    }
+}
