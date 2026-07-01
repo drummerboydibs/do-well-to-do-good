@@ -41,6 +41,9 @@
                         Source:
                         <a href="@_tip.SourceUrl" target="_blank" rel="noopener noreferrer" class="font-semibold">@_tip.SourceName <span aria-hidden="true">↗</span><span class="sr-only">(opens in a new tab)</span></a>
                     </p>
+                    <p class="m-0 mt-3">
+                        <button type="button" class="btn btn-ghost !min-h-0 py-1.5 text-sm" @onclick="ShuffleTip">↻ Show me another tip</button>
+                    </p>
                 </div>
                 <p class="text-muted text-xs max-w-lg mx-auto">General wellbeing information, not medical advice. If you’re struggling, please reach out to a professional or someone you trust.</p>
             }
@@ -50,6 +53,9 @@
     }
     else
     {
+        <OpenGoalsReminder />
+        <DefinitionOfDay />
+
         <div class="card">
             <h1>What’s on your mind?</h1>
             @if (Auth.IsSignedIn)
@@ -157,6 +163,7 @@
     private bool _saving;
     private string? _saveError;
     private Tip? _tip;
+    private EmotionInfo? _tipEmotion;
     private int _releaseKey;
 
     private readonly List<string> _allNames = EmotionCatalog.AllNames().ToList();
@@ -194,6 +201,7 @@
         _released = false;
         _savedToJournal = false;
         _tip = null;
+        _tipEmotion = null;
     }
 
     private void OnVaultUnlocked() => _showVault = false;
@@ -202,14 +210,21 @@
     // field still says the same thing), avoid recently shown tips, remember this one.
     private async Task<Tip> PickTipAsync()
     {
-        var resolved = _selectedEmotion is not null
+        _tipEmotion = _selectedEmotion is not null
             && string.Equals(_selectedEmotion.Name, _emotion.Trim(), StringComparison.OrdinalIgnoreCase)
             ? _selectedEmotion
             : EmotionCatalog.Find(_emotion);
 
-        var tip = TipLibrary.Pick(resolved, await TipHistory.GetRecentAsync());
+        var tip = TipLibrary.Pick(_tipEmotion, await TipHistory.GetRecentAsync());
         await TipHistory.RecordAsync(tip.Id);
         return tip;
+    }
+
+    // Swap in a different tip from the same feeling's pool, still avoiding recent repeats.
+    private async Task ShuffleTip()
+    {
+        _tip = TipLibrary.Pick(_tipEmotion, await TipHistory.GetRecentAsync());
+        await TipHistory.RecordAsync(_tip.Id);
     }
 
     private async Task SaveEntry()

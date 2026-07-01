@@ -2,8 +2,6 @@
 @using DoWellToDoGood.Services
 @implements IDisposable
 @inject AuthService Auth
-@inject CryptoService Crypto
-@inject TherapyService Therapy
 
 <PageTitle>Do Well to Do Good — private mental wellness journaling</PageTitle>
 
@@ -30,41 +28,7 @@
         </section>
 
         <section class="mx-auto max-w-3xl px-6 pb-2">
-            @if (!Crypto.IsUnlocked)
-            {
-                <div class="card-soft flex items-center justify-between gap-3 flex-wrap">
-                    <p class="m-0 text-muted">Unlock to see your therapy goals for the week.</p>
-                    <a class="btn !min-h-0 py-2" href="therapy">Unlock &amp; view →</a>
-                </div>
-            }
-            else if (_goals.Count > 0)
-            {
-                <div class="card space-y-3">
-                    <div class="flex items-center justify-between gap-2 flex-wrap">
-                        <h2 class="m-0 text-base font-bold">Your open goals</h2>
-                        <a class="text-sm font-semibold" href="therapy">Log progress →</a>
-                    </div>
-                    <ul class="space-y-2 m-0 pl-0" style="list-style:none">
-                        @foreach (var g in _goals)
-                        {
-                            <li class="flex items-baseline justify-between gap-3 flex-wrap rounded-bubble bg-surface-2 border border-line p-3">
-                                <span class="font-semibold">@g.Title</span>
-                                @if (g.End is not null)
-                                {
-                                    <span class="text-xs @(g.Overdue ? "font-semibold" : "text-muted")"
-                                          style="@(g.Overdue ? "color:var(--color-danger)" : "")">
-                                        @(g.Overdue ? "⚠ was due " : "by ")@g.End.Value.ToString("MMM d, yyyy")
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="text-xs text-muted">no end date</span>
-                                }
-                            </li>
-                        }
-                    </ul>
-                </div>
-            }
+            <OpenGoalsReminder />
         </section>
     }
     else
@@ -90,6 +54,10 @@
             </div>
         </section>
     }
+
+    <section class="mx-auto max-w-3xl px-6 pb-2">
+        <DefinitionOfDay />
+    </section>
 
     @* ===================== Features ===================== *@
     <section class="mx-auto max-w-5xl px-6 py-8">
@@ -180,53 +148,7 @@
 </div>
 
 @code {
-    private List<GoalReminder> _goals = new();
-    private sealed record GoalReminder(string Title, DateOnly? End, bool Overdue);
-
-    protected override void OnInitialized()
-    {
-        Auth.Changed += OnChanged;
-        Crypto.Changed += OnChanged;
-    }
-
-    protected override async Task OnInitializedAsync() => await LoadGoalsAsync();
-
-    private async Task LoadGoalsAsync()
-    {
-        if (!Auth.IsSignedIn || !Crypto.IsUnlocked) { _goals = new(); return; }
-        try
-        {
-            var rows = await Therapy.ListGoalsAsync(openOnly: true);
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var list = new List<GoalReminder>();
-            foreach (var r in rows)
-            {
-                try
-                {
-                    using var doc = System.Text.Json.JsonDocument.Parse(await Crypto.DecryptAsync(r.Payload));
-                    var title = doc.RootElement.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
-                    DateOnly? legacyEnd = doc.RootElement.TryGetProperty("end", out var e)
-                        && e.ValueKind == System.Text.Json.JsonValueKind.String
-                        && DateOnly.TryParse(e.GetString(), out var d) ? d : null;
-                    var end = r.EndDate ?? legacyEnd;
-                    list.Add(new GoalReminder(title, end, end is { } ed && ed < today));
-                }
-                catch { /* skip a goal that won't decrypt */ }
-            }
-            _goals = list.OrderBy(g => g.End ?? DateOnly.MaxValue).ToList();
-        }
-        catch { _goals = new(); }
-    }
-
-    private async void OnChanged()
-    {
-        await LoadGoalsAsync();
-        await InvokeAsync(StateHasChanged);
-    }
-
-    public void Dispose()
-    {
-        Auth.Changed -= OnChanged;
-        Crypto.Changed -= OnChanged;
-    }
+    protected override void OnInitialized() => Auth.Changed += OnChanged;
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose() => Auth.Changed -= OnChanged;
 }

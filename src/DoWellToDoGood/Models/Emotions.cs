@@ -112,6 +112,26 @@ public static class EmotionCatalog
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
 
+    private static IReadOnlyList<(string Name, string Definition)>? _allFeelings;
+
+    /// <summary>Every feeling (core, secondary, tertiary) with its definition, in a stable order.</summary>
+    public static IReadOnlyList<(string Name, string Definition)> AllFeelings()
+    {
+        if (_allFeelings is not null) return _allFeelings;
+        var list = new List<(string, string)>();
+        foreach (var c in Cores)
+        {
+            list.Add((c.Name, c.Definition));
+            foreach (var s in c.Secondaries)
+            {
+                list.Add((s.Name, s.Definition));
+                foreach (var t in s.Tertiaries)
+                    list.Add((t.Name, t.Definition));
+            }
+        }
+        return _allFeelings = list;
+    }
+
     /// <summary>Look up any feeling by name (case-insensitive). Returns null for free text.</summary>
     public static EmotionInfo? Find(string? name)
     {
