@@ -256,6 +256,19 @@ html[data-theme="dark"] #blazor-error-ui {
 
     .badge { @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold; background: var(--color-primary-soft); color: var(--color-primary-hover); }
 
+    /* Native date-field calendar icon — make it clearly tappable (color-scheme
+       already flips the native picker light/dark to match the theme). */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        opacity: 0.85;
+        padding: 2px;
+        border-radius: 6px;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator:hover {
+        opacity: 1;
+        background: var(--color-primary-soft);
+    }
+
     .nav-link {
         @apply rounded-full px-4 py-2 font-semibold no-underline transition;
         color: var(--color-ink);
