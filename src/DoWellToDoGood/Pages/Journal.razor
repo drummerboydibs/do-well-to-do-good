@@ -18,7 +18,7 @@
             <div class="release-bubbles" aria-hidden="true">
                 <span></span><span></span><span></span><span></span><span></span>
             </div>
-            <h1 class="mt-4">@(_savedToJournal ? "Saved." : "Released.")</h1>
+            <h1 class="mt-4" @ref="_resultHeading" tabindex="-1">@(_savedToJournal ? "Saved." : "Released.")</h1>
             <p class="text-lg text-muted">
                 @(_savedToJournal
                     ? "Your words are kept — encrypted so only you can read them."
@@ -32,6 +32,7 @@
             @if (_tip is not null)
             {
                 <div class="mx-auto my-6 max-w-lg rounded-bubble-lg border border-line p-5 text-left"
+                     aria-live="polite"
                      style="background:linear-gradient(180deg, var(--color-primary-soft), var(--color-surface) 80%)">
                     <p class="uppercase tracking-wider text-xs font-bold m-0 mb-2" style="color:var(--color-primary-hover)">
                         A thought to carry with you
@@ -166,6 +167,21 @@
     private EmotionInfo? _tipEmotion;
     private int _releaseKey;
 
+    // After releasing/saving, the whole card swaps to the confirmation. Move focus
+    // to its heading so keyboard users land there and screen readers announce it
+    // (there's no route change, so FocusOnNavigate can't do this for us).
+    private ElementReference _resultHeading;
+    private bool _focusResult;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusResult)
+        {
+            _focusResult = false;
+            try { await _resultHeading.FocusAsync(); } catch { /* view may have moved on */ }
+        }
+    }
+
     private readonly List<string> _allNames = EmotionCatalog.AllNames().ToList();
 
     private bool CanSubmit => !string.IsNullOrWhiteSpace(_body);
@@ -194,6 +210,7 @@
         _showWheel = false;
         _released = true;
         _releaseKey++;
+        _focusResult = true;
     }
 
     private void Reset()
@@ -248,6 +265,7 @@
             _savedToJournal = true;
             _released = true;
             _releaseKey++;
+            _focusResult = true;
         }
         catch
         {

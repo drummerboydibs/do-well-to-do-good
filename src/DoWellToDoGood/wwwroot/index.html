@@ -49,7 +49,10 @@
     <div id="blazor-error-ui">
         Something went wrong.
         <a href="" class="reload">Reload</a>
-        <a class="dismiss">🗙</a>
+        <button type="button" class="dismiss" aria-label="Dismiss this message"
+                onclick="document.getElementById('blazor-error-ui').style.display='none'">
+            <span aria-hidden="true">🗙</span>
+        </button>
     </div>
     <script src="js/theme.js"></script>
     <script src="js/wheel.js"></script>
