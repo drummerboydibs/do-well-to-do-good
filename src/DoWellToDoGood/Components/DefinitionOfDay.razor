@@ -1,11 +1,12 @@
 @using DoWellToDoGood.Models
 
-@* A rotating "feeling of the day" drawn from the 130-feeling catalog.
-   Deterministic per calendar day, so everyone sees the same one each day. *@
+@* A rotating "word of the day" — a feeling from the 130-feeling wheel or a
+   wellbeing term — with its plain-language definition. Deterministic per
+   calendar day, so everyone sees the same one each day. *@
 @if (_name is not null)
 {
     <div class="card-soft mb-6">
-        <p class="text-xs font-bold uppercase tracking-wider m-0 mb-1" style="color:var(--color-primary-hover)">Feeling of the day</p>
+        <p class="text-xs font-bold uppercase tracking-wider m-0 mb-1" style="color:var(--color-primary-hover)">Word of the day</p>
         <p class="m-0"><span class="font-bold">@_name</span> — <span class="text-muted">@_definition</span></p>
     </div>
 }
@@ -14,11 +15,15 @@
     private string? _name;
     private string _definition = "";
 
+    // Feelings (from the wheel) plus supplementary wellbeing vocabulary, in a
+    // stable order so the per-day pick is deterministic.
+    private static readonly IReadOnlyList<(string Name, string Definition)> Pool =
+        EmotionCatalog.AllFeelings().Concat(WellnessTerms.All).ToList();
+
     protected override void OnInitialized()
     {
-        var all = EmotionCatalog.AllFeelings();
-        if (all.Count == 0) return;
-        var idx = DateOnly.FromDateTime(DateTime.Today).DayNumber % all.Count;
-        (_name, _definition) = all[idx];
+        if (Pool.Count == 0) return;
+        var idx = DateOnly.FromDateTime(DateTime.Today).DayNumber % Pool.Count;
+        (_name, _definition) = Pool[idx];
     }
 }
