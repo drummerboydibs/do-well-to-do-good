@@ -15,7 +15,9 @@ Journal your thoughts, feelings, and mood — then save them privately (encrypte
 - **My journal** — your saved entries, newest first, color-tinted by emotional valence, **paginated** (10 per page, decrypting only the page you're viewing), with quick access back to writing.
 - **Zero-knowledge encryption** — saved entries are encrypted in your browser with a key only you hold; the server stores nothing but ciphertext. See [Privacy & architecture](#privacy--architecture).
 - **Emotion wheel** — the full three-ring feelings wheel (130 feelings, each with a plain-language definition). Tap a color to zoom into a family; fully operable by mouse, touch, and keyboard (arrow keys + Enter), with a live definition panel.
-- **Cited tips** — wellness tips matched to your emotion, paraphrased in plain language and **credited with a link** to the original source (NHS, NIMH/NIH, APA, Mayo Clinic, UC Berkeley's Greater Good Science Center).
+- **Cited tips** — wellness tips matched to your emotion, paraphrased in plain language and **credited with a link** to the original source (NHS, NIH — NIMH & NIA, APA, Mayo Clinic, and UC Berkeley's Greater Good). Not feeling it? A **"show me another"** shuffle offers a fresh one without repeating recent tips.
+- **Therapy & goals** — signed-in users can log therapy sessions, set up to four goals (each with an optional target date), record progress over time, and get open-goal reminders on the home and writing pages — all encrypted, just like journal entries.
+- **Word of the day** — a rotating feeling or wellbeing term with a plain-language definition, chosen deterministically per day and skewed toward gentler words so it never leads with a heavy one.
 - **Resources** — a vetted directory of crisis lines and support (988 Suicide & Crisis Lifeline, Crisis Text Line, SAMHSA), gambling and addiction help, therapist directories, and an international fallback — reachable by anyone, signed in or not.
 - **Account summary** — member-since and last-login dates (in your local time), plus your saved-entry count, "shouted into the wind" count, and current daily streak.
 - **Light / dark / system theme** — resolved before first paint (no flash), respecting your OS preference.
@@ -54,7 +56,7 @@ Then open the URL printed in the console. The app is wired to a live Supabase pr
 
 ## Tests
 
-Unit tests cover the pure logic — auth/JWT parsing, encryption service wiring, the emotion taxonomy, tip selection, streaks, theming, and pagination math:
+Unit tests cover the pure logic — auth/JWT parsing, encryption-service wiring, the emotion taxonomy, tip selection and the tip library's data integrity (every tip cited, ids unique), the gentler word-of-the-day pool, streak and shout tracking, tip history, theming, and pagination math:
 
 ```bash
 dotnet test tests/DoWellToDoGood.Tests/DoWellToDoGood.Tests.csproj -p:SkipTailwind=true
@@ -67,11 +69,11 @@ dotnet test tests/DoWellToDoGood.Tests/DoWellToDoGood.Tests.csproj -p:SkipTailwi
 ```
 do-well-to-do-good/
 ├─ src/DoWellToDoGood/
-│  ├─ Pages/        # Routable pages: Home, Journal, Entries (My journal), Signin (Account), Resources, Palette
+│  ├─ Pages/        # Routable pages: Home, Journal, Entries (My journal), Therapy, Signin (Account), Resources, Palette
 │  ├─ Layout/       # App shell: MainLayout, NavMenu
-│  ├─ Components/   # Reusable UI: EmotionWheel, VaultGate (encryption setup/unlock)
-│  ├─ Models/       # Emotions taxonomy, cited Tips library
-│  ├─ Services/     # Auth, Crypto, Entries, Stats, Theme, TipHistory, Pagination, SupabaseConfig
+│  ├─ Components/   # Reusable UI: EmotionWheel, VaultGate (encryption setup/unlock), OpenGoalsReminder, DefinitionOfDay (word of the day)
+│  ├─ Models/       # Emotions taxonomy, cited Tips library, WellnessTerms vocabulary
+│  ├─ Services/     # Auth, Crypto, Entries, Therapy, Stats, Theme, TipHistory, Pagination, SupabaseConfig
 │  ├─ Styles/       # tailwind.css (source) → wwwroot/css/app.css (generated)
 │  ├─ wwwroot/      # Static assets: icons, fonts, js (theme / wheel / crypto), index.html
 │  └─ package.json  # Tailwind CLI + self-hosted Quicksand
@@ -86,6 +88,7 @@ Privacy is the core design principle, not an afterthought:
 
 - **Guest / "shout into the wind"** content stays in the browser, in memory only, and is wiped on submit, navigation, or session end — it never touches the network.
 - **Saved entries use zero-knowledge encryption.** On first save you set an encryption passphrase; a key derived from it (Web Crypto PBKDF2) unwraps a random, per-user data key that AES-GCM-encrypts each entry's body and emotion. The server only ever stores ciphertext — unreadable by anyone, including a database administrator. A one-time **recovery code** is the only backup; losing both the passphrase and the recovery code means the entries are unrecoverable **by design**. The data key lives only in browser memory and is wiped on lock, sign-out, or page close.
+- **Therapy notes are encrypted the same way.** Session notes, goals, and progress entries are AES-GCM-encrypted in the browser with that same per-user key. The only plaintext stored is a goal's optional target date — low-sensitivity metadata, kept in the clear so the app can sort and remind by it without decrypting everything.
 - **Passwordless auth** — email magic links only, so there's no password to leak. The database enforces per-user Row-Level Security, so a request can only ever touch its owner's rows.
 - **No third-party tracking** — no profiling analytics and no third-party font CDNs (Quicksand is self-hosted), so visiting the app doesn't leak your data to outside services.
 
@@ -95,12 +98,9 @@ Pushes to `main` are published to **GitHub Pages** by [`.github/workflows/deploy
 
 ## Roadmap
 
-The backlog lives in [GitHub Issues](https://github.com/drummerboydibs/do-well-to-do-good/issues). Highlights:
+The backlog lives in [GitHub Issues](https://github.com/drummerboydibs/do-well-to-do-good/issues). Highlights still open:
 
-- **Therapy notes** (epic) — patient-side therapy notes, goals with optional dates, and reminders.
-- **Definition of the day** and a **shuffle / next** control for tips.
 - **Search for saved entries** (privacy-preserving — a client-side or blind index, never a server-side content search).
-- **Suggestion link** for users to request features.
 - **.NET 10 upgrade.**
 
 ## Credits

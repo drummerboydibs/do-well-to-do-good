@@ -105,4 +105,52 @@ public class EmotionCatalogTests
         foreach (var name in EmotionCatalog.AllNames())
             Assert.NotNull(EmotionCatalog.Find(name));
     }
+
+    // ---- GentleFeelings (the word-of-the-day pool) ----
+
+    [Fact]
+    public void GentleFeelings_IsNonEmpty_WithDefinitions()
+    {
+        var gentle = EmotionCatalog.GentleFeelings();
+
+        Assert.NotEmpty(gentle);
+        Assert.All(gentle, f =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(f.Name));
+            Assert.False(string.IsNullOrWhiteSpace(f.Definition));
+        });
+    }
+
+    [Fact]
+    public void GentleFeelings_ExcludesEveryNegativeFeeling()
+    {
+        // The whole point: a random word of the day must never be a heavy feeling.
+        // Every entry must resolve to a feeling whose valence is non-negative.
+        foreach (var (name, _) in EmotionCatalog.GentleFeelings())
+        {
+            var info = EmotionCatalog.Find(name);
+            Assert.NotNull(info);
+            Assert.True(info!.Valence >= 0, $"'{name}' has negative valence ({info.Valence}) and shouldn't be a gentle feeling.");
+        }
+    }
+
+    [Theory]
+    [InlineData("Happy")]     // positive core
+    [InlineData("Joyful")]    // positive tertiary
+    [InlineData("Peaceful")]  // positive secondary
+    public void GentleFeelings_IncludesPositiveFeelings(string name)
+    {
+        Assert.Contains(EmotionCatalog.GentleFeelings(), f => f.Name == name);
+    }
+
+    [Theory]
+    [InlineData("Despair")]   // very negative secondary
+    [InlineData("Grief")]     // negative tertiary
+    [InlineData("Sad")]       // negative core
+    [InlineData("Angry")]     // negative core
+    [InlineData("Confused")]  // negative secondary under a positive core (Surprised)
+    public void GentleFeelings_OmitsHeavyFeelings(string name)
+    {
+        Assert.DoesNotContain(EmotionCatalog.GentleFeelings(), f => f.Name == name);
+    }
 }

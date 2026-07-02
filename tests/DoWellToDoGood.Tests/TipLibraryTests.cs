@@ -71,13 +71,19 @@ public class TipLibraryTests
     public void Pick_FallsBackToFullPool_WhenEverythingIsRecent()
     {
         var happy = EmotionCatalog.Find("Happy");
-        var allHappy = new[] { "hap-1", "hap-2", "hap-3", "hap-4" };
 
-        // No fresh candidates remain, so it should still return a valid Happy tip
-        // rather than throwing or returning a default.
+        // Discover the whole Happy pool empirically so this doesn't go stale as the
+        // library grows (Pick only ever draws from "hap-" for a core Happy feeling).
+        var allHappy = new HashSet<string>();
+        for (var i = 0; i < Iterations; i++)
+            allHappy.Add(TipLibrary.Pick(happy).Id);
+
+        // With every id marked recent there are no fresh candidates left, so it must
+        // still return a valid Happy tip rather than throwing or returning a default.
+        var recent = allHappy.ToArray();
         for (var i = 0; i < Iterations; i++)
         {
-            var tip = TipLibrary.Pick(happy, allHappy);
+            var tip = TipLibrary.Pick(happy, recent);
             Assert.Contains(tip.Id, allHappy);
         }
     }
@@ -98,5 +104,29 @@ public class TipLibraryTests
             Assert.True(allowed.Any(p => tip.Id.StartsWith(p)),
                 $"Unexpected tip '{tip.Id}' for 'Overwhelmed'.");
         }
+    }
+
+    [Fact]
+    public void Pick_Respected_CascadesThroughConfidenceConnectionAndHappy()
+    {
+        // "Respected" (tertiary under Happy › Accepted) exercises both new pools:
+        // itself → Confidence ("cnf-"), its parent "Accepted" → Connection ("con-"),
+        // and its "happy" core → Happy ("hap-"). It must stay within those three.
+        var respected = EmotionCatalog.Find("Respected");
+        Assert.NotNull(respected);
+
+        var allowed = new[] { "cnf-", "con-", "hap-" };
+        bool sawConfidence = false, sawConnection = false;
+        for (var i = 0; i < Iterations; i++)
+        {
+            var tip = TipLibrary.Pick(respected);
+            Assert.True(allowed.Any(p => tip.Id.StartsWith(p)),
+                $"Unexpected tip '{tip.Id}' for 'Respected'.");
+            sawConfidence |= tip.Id.StartsWith("cnf-");
+            sawConnection |= tip.Id.StartsWith("con-");
+        }
+
+        Assert.True(sawConfidence, "Expected at least one Confidence tip for 'Respected'.");
+        Assert.True(sawConnection, "Expected at least one Connection tip for 'Respected'.");
     }
 }
