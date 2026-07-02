@@ -12,7 +12,7 @@ public record Tip(string Id, string Text, string SourceName, string SourceUrl);
 /// Tips matched to the feelings wheel at the most specific level available:
 /// exact feeling → parent feeling → core family → general fallback. Every tip
 /// is attributed to a reputable, evidence-based source (NHS, NIH/NIMH/NIA, APA,
-/// Mayo Clinic, UC Berkeley's Greater Good). URLs verified June 2026.
+/// Mayo Clinic, UC Berkeley's Greater Good). URLs verified July 2026.
 /// Tips live in the app (not the database) on purpose: querying tips by emotion
 /// would tell the server what a user is feeling, which this app must never know.
 /// </summary>
@@ -22,6 +22,7 @@ public static class TipLibrary
     private const string NhsFiveSteps = "https://www.nhs.uk/mental-health/self-help/guides-tools-and-activities/five-steps-to-mental-wellbeing/";
     private const string NhsStress = "https://www.nhs.uk/mental-health/self-help/guides-tools-and-activities/tips-to-reduce-stress/";
     private const string NhsSleep = "https://www.nhs.uk/every-mind-matters/mental-wellbeing-tips/how-to-fall-asleep-faster-and-sleep-better/";
+    private const string NhsSelfEsteem = "https://www.nhs.uk/mental-health/self-help/tips-and-support/raise-low-self-esteem/";
     private const string NimhAnxiety = "https://www.nimh.nih.gov/health/topics/anxiety-disorders";
     private const string NimhStress = "https://www.nimh.nih.gov/health/publications/so-stressed-out-fact-sheet";
     private const string NimhCaring = "https://www.nimh.nih.gov/health/topics/caring-for-your-mental-health";
@@ -34,6 +35,10 @@ public static class TipLibrary
     private const string GgSavoring = "https://greatergood.berkeley.edu/article/item/10_steps_to_savoring_the_good_things_in_life";
     private const string GgGratitudeJournal = "https://ggia.berkeley.edu/practice/gratitude_journal";
     private const string GgSelfCompassion = "https://ggia.berkeley.edu/practice/self_compassion_break";
+    private const string GgKindness = "https://ggia.berkeley.edu/practice/random_acts_of_kindness";
+
+    private const string Gg = "Greater Good, UC Berkeley";
+    private const string Nimh = "NIMH — Caring for Your Mental Health";
 
     private static Tip T(string id, string text, string source, string url) => new(id, text, source, url);
 
@@ -41,17 +46,20 @@ public static class TipLibrary
 
     private static readonly Tip[] Happy =
     {
-        T("hap-1", "Pause and really take this in. Researchers call it “savoring” — lingering on a good moment helps its benefits last longer.", "Greater Good Science Center, UC Berkeley", GgSavoring),
-        T("hap-2", "Try jotting down a few things you’re grateful for. A regular gratitude habit is linked to more positive emotion and stronger relationships.", "Greater Good in Action, UC Berkeley", GgGratitudeJournal),
+        T("hap-1", "Pause and really take this in. Researchers call it “savoring” — lingering on a good moment helps its benefits last longer.", Gg, GgSavoring),
+        T("hap-2", "Try jotting down a few things you’re grateful for. A regular gratitude habit is linked to more positive emotion and stronger relationships.", Gg, GgGratitudeJournal),
         T("hap-3", "Good feelings often grow when shared. Acts of kindness and giving to others can deepen your own sense of wellbeing.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
         T("hap-4", "Take a moment to notice the present — the sights, sounds, and feelings around you. Paying attention on purpose strengthens wellbeing.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
+        T("hap-5", "Let yourself linger here without rushing on. Noticing a good moment as it happens is a skill that grows the more you use it.", Gg, GgSavoring),
+        T("hap-6", "Feeling good is a great moment to be kind — a small act for someone else spreads the lift and deepens it in you.", Gg, GgKindness),
     };
 
     private static readonly Tip[] Surprised =
     {
-        T("sur-1", "The unexpected can take a moment to absorb. A few slow breaths can help you respond thoughtfully rather than react.", "NIMH — Caring for Your Mental Health", NimhCaring),
+        T("sur-1", "The unexpected can take a moment to absorb. A few slow breaths can help you respond thoughtfully rather than react.", Nimh, NimhCaring),
         T("sur-2", "When things feel up in the air, gently bringing your attention to the present moment can help steady you.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
-        T("sur-3", "Big news lands easier with company. Talking it through with someone you trust can help you sort out what it means.", "NIMH — Caring for Your Mental Health", NimhCaring),
+        T("sur-3", "Big news lands easier with company. Talking it through with someone you trust can help you sort out what it means.", Nimh, NimhCaring),
+        T("sur-4", "Change — even welcome change — asks something of you. Steady basics like sleep, meals, and a walk help you meet it.", Nimh, NimhCaring),
     };
 
     private static readonly Tip[] Bad =
@@ -60,14 +68,17 @@ public static class TipLibrary
         T("bad-2", "Protecting your sleep and eating regular meals gives you more to cope with. Rest is part of the work, not a reward for finishing it.", "NIMH — I’m So Stressed Out", NimhStress),
         T("bad-3", "A short walk or any movement can lower the intensity of stress and help clear your head.", "NHS — 10 stress busters", NhsStress),
         T("bad-4", "It’s okay to say no. Deciding what must get done and what can wait protects your energy for what matters.", "NIMH — I’m So Stressed Out", NimhStress),
+        T("bad-5", "Go easy on the crutches — leaning harder on caffeine, alcohol, or the phone tends to add problems rather than solve them.", "NHS — 10 stress busters", NhsStress),
+        T("bad-6", "Being stretched thin is a cue to connect, not retreat. A few minutes with someone who gets it can refill the tank.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
     };
 
     private static readonly Tip[] Fearful =
     {
         T("fea-1", "When worry spikes, slow breathing or a grounding exercise can calm your body’s alarm response.", "NIMH — Anxiety Disorders", NimhAnxiety),
         T("fea-2", "Notice an anxious thought, then gently question it: is it a fact, or a fear? Naming it can cut it down to size.", "NIMH — I’m So Stressed Out", NimhStress),
-        T("fea-3", "Reaching out to someone you trust can help carry what feels heavy right now.", "NIMH — Caring for Your Mental Health", NimhCaring),
+        T("fea-3", "Reaching out to someone you trust can help carry what feels heavy right now.", Nimh, NimhCaring),
         T("fea-4", "Regular movement — even a little — is one of the most reliable ways to take the edge off anxious energy.", "NIMH — Anxiety Disorders", NimhAnxiety),
+        T("fea-5", "Naming the worst case can shrink it: ask what you’d actually do if the feared thing happened. A plan is calmer than a loop.", "NIMH — I’m So Stressed Out", NimhStress),
     };
 
     private static readonly Tip[] Angry =
@@ -76,13 +87,15 @@ public static class TipLibrary
         T("ang-2", "Anger often rides on something underneath. Naming the need beneath it can help you act on what really matters.", "American Psychological Association", ApaAngerStrategies),
         T("ang-3", "Stepping away or moving your body for a few minutes can take the edge off before you say something you’d take back.", "Mayo Clinic — Anger management", MayoAnger),
         T("ang-4", "Once you’re calmer, look for one piece of the problem you can actually fix — working the solvable part beats stewing on the whole.", "Mayo Clinic — Anger management", MayoAnger),
+        T("ang-5", "Try swapping “this is awful” for “this is frustrating.” How you talk to yourself in the heat of it shapes how hot it gets.", "American Psychological Association", ApaAngerStrategies),
     };
 
     private static readonly Tip[] Disgusted =
     {
-        T("dis-1", "Strong aversion can be a boundary speaking. Noticing what you want to move away from can clarify what matters to you.", "NIMH — Caring for Your Mental Health", NimhCaring),
-        T("dis-2", "Putting a feeling into words — even an uncomfortable one — can make it easier to sit with.", "NIMH — Caring for Your Mental Health", NimhCaring),
-        T("dis-3", "If the judgment is aimed at yourself, try answering it with the kindness you’d offer a friend. Self-compassion beats self-criticism for actually getting through hard moments.", "Greater Good in Action, UC Berkeley", GgSelfCompassion),
+        T("dis-1", "Strong aversion can be a boundary speaking. Noticing what you want to move away from can clarify what matters to you.", Nimh, NimhCaring),
+        T("dis-2", "Putting a feeling into words — even an uncomfortable one — can make it easier to sit with.", Nimh, NimhCaring),
+        T("dis-3", "If the judgment is aimed at yourself, try answering it with the kindness you’d offer a friend. Self-compassion beats self-criticism for getting through hard moments.", Gg, GgSelfCompassion),
+        T("dis-4", "Sitting with an unpleasant feeling for a moment, rather than pushing it away, often takes some of its charge out.", Nimh, NimhCaring),
     };
 
     private static readonly Tip[] Sad =
@@ -91,6 +104,8 @@ public static class TipLibrary
         T("sad-2", "Even a small dose of movement — like a 30-minute walk — can lift your mood. Doing one thing you used to enjoy helps too, even if you don’t feel like it.", "NIMH — Depression", NimhDepression),
         T("sad-3", "Connection matters most when you feel low. Reaching out to someone you trust, even briefly, can help.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
         T("sad-4", "Set one small, realistic goal for today — something you can actually finish. Small wins are real wins when you’re low.", "NIMH — Depression", NimhDepression),
+        T("sad-5", "Keep a gentle routine — regular sleep, meals, and a little daylight give a low mood fewer footholds.", "NIMH — Depression", NimhDepression),
+        T("sad-6", "You don’t have to feel like it first. Doing one small, kind thing for yourself can come before the motivation, not after.", "NIMH — Depression", NimhDepression),
     };
 
     // ===================== Specific-feeling pools =====================
@@ -100,6 +115,7 @@ public static class TipLibrary
         T("anx-1", "Try a slow count: breathe in for four, out for six, a few times over. Longer exhales signal your body that it’s safe to settle.", "NIMH — Anxiety Disorders", NimhAnxiety),
         T("anx-2", "Worry shrinks when it’s scheduled. Write the worry down now and pick a time to deal with it — your mind can stop holding it.", "NHS — Fall asleep faster and sleep better", NhsSleep),
         T("anx-3", "Anxious energy wants somewhere to go. A brisk walk, stretching, or any movement gives it an exit.", "NIMH — I’m So Stressed Out", NimhStress),
+        T("anx-4", "Name five things you can see, four you can hear, three you can touch. Grounding in your senses pulls you out of the what-ifs and into now.", "NIMH — Anxiety Disorders", NimhAnxiety),
     };
 
     private static readonly Tip[] Lonely =
@@ -107,6 +123,7 @@ public static class TipLibrary
         T("lon-1", "Loneliness eases with small, regular contact. One short call or video chat with someone familiar counts for more than it feels like it should.", "National Institute on Aging — Staying Connected", NiaLoneliness),
         T("lon-2", "Joining in around something you already enjoy — a class, a club, a walk group — is one of the most reliable paths back to feeling connected.", "National Institute on Aging — Staying Connected", NiaLoneliness),
         T("lon-3", "Helping someone else is a powerful antidote to isolation — volunteering and small favors build connection in both directions.", "National Institute on Aging — Staying Connected", NiaLoneliness),
+        T("lon-4", "Loneliness lies that you’d be a burden. Most people are glad to be asked — a simple “want to catch up?” is often welcome.", "National Institute on Aging — Staying Connected", NiaLoneliness),
     };
 
     private static readonly Tip[] Grief =
@@ -114,6 +131,7 @@ public static class TipLibrary
         T("gri-1", "Grief has no schedule. Letting it move at its own pace — without judging yourself for how long it takes — is part of healing.", "American Psychological Association — Grief", ApaGrief),
         T("gri-2", "Sharing memories with others who loved them — stories, photos, their favorite music — helps everyone carry the loss together.", "American Psychological Association — Grief", ApaGrief),
         T("gri-3", "Honoring who you lost in a small, concrete way — a ritual, a donation, something planted — can give love somewhere to go.", "American Psychological Association — Grief", ApaGrief),
+        T("gri-4", "Tend to the basics while you grieve — rest, food, gentle support. Most people heal in time when those are in place.", "American Psychological Association — Grief", ApaGrief),
     };
 
     private static readonly Tip[] Sleep =
@@ -121,13 +139,15 @@ public static class TipLibrary
         T("slp-1", "A wind-down routine — same time, gentle activity, screens away — teaches your body when to power down.", "NHS — Fall asleep faster and sleep better", NhsSleep),
         T("slp-2", "If your mind races at night, park it on paper: jot tomorrow’s to-dos before bed so your brain can clock out.", "NHS — Fall asleep faster and sleep better", NhsSleep),
         T("slp-3", "Quiet, dark, and cool is the recipe for restful sleep — and something calm like reading or soft music beats scrolling.", "NHS — Fall asleep faster and sleep better", NhsSleep),
+        T("slp-4", "If sleep won’t come, get up and do something calm in dim light, then return when you’re drowsy — lying there frustrated only trains wakefulness.", "NHS — Fall asleep faster and sleep better", NhsSleep),
     };
 
     private static readonly Tip[] SelfCompassion =
     {
-        T("cmp-1", "Talk to yourself the way you’d talk to a friend in this exact spot. People who meet their own struggles with kindness recover better than those who self-criticize.", "Greater Good in Action, UC Berkeley", GgSelfCompassion),
-        T("cmp-2", "Try naming it plainly: “This is a moment of struggle — and struggling is part of being human.” You’re not the only one who’s been here.", "Greater Good in Action, UC Berkeley", GgSelfCompassion),
-        T("cmp-3", "Guilt is information, not a verdict. Take what it’s teaching you, make what repair you can, and let the rest go.", "NIMH — Caring for Your Mental Health", NimhCaring),
+        T("cmp-1", "Talk to yourself the way you’d talk to a friend in this exact spot. People who meet their own struggles with kindness recover better than those who self-criticize.", Gg, GgSelfCompassion),
+        T("cmp-2", "Try naming it plainly: “This is a moment of struggle — and struggling is part of being human.” You’re not the only one who’s been here.", Gg, GgSelfCompassion),
+        T("cmp-3", "Guilt is information, not a verdict. Take what it’s teaching you, make what repair you can, and let the rest go.", Nimh, NimhCaring),
+        T("cmp-4", "Put a hand on your heart and offer yourself a kind phrase — “may I be gentle with myself right now.” It sounds small; the body listens.", Gg, GgSelfCompassion),
     };
 
     private static readonly Tip[] Stress =
@@ -135,28 +155,48 @@ public static class TipLibrary
         T("str-1", "Break the mountain into pebbles: list what’s on you, pick the single next step, and do only that.", "NHS — 10 stress busters", NhsStress),
         T("str-2", "Decide what actually must happen today — and give yourself real permission to let the rest wait.", "NIMH — I’m So Stressed Out", NimhStress),
         T("str-3", "Build in something that isn’t work: a few minutes of something you enjoy is maintenance, not indulgence.", "NIMH — I’m So Stressed Out", NimhStress),
+        T("str-4", "A good support network helps you see a problem differently. Talking it through with a friend is a legitimate stress tool, not a distraction.", "NHS — 10 stress busters", NhsStress),
     };
 
     private static readonly Tip[] Bored =
     {
         T("bor-1", "Boredom is often hunger for something new. Learning anything — a recipe, a skill, a few words of a language — feeds it and builds confidence.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
         T("bor-2", "Set yourself a small challenge with a finish line. Goals you can actually reach are fuel for feeling engaged again.", "NHS — 10 stress busters", NhsStress),
+        T("bor-3", "Restlessness can be a nudge toward connection or movement — message a friend, step outside, or start one small thing you’ve meant to try.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
     };
 
     private static readonly Tip[] Uplift =
     {
-        T("upl-1", "Tonight, write down three things that went well today and why. It’s a tiny habit with an outsized effect on wellbeing.", "Greater Good in Action, UC Berkeley", GgGratitudeJournal),
-        T("upl-2", "Stretch this feeling: tell someone about it, replay it, or note what made it happen. Shared and savored joys last longer.", "Greater Good Science Center, UC Berkeley", GgSavoring),
+        T("upl-1", "Tonight, write down three things that went well today and why. It’s a tiny habit with an outsized effect on wellbeing.", Gg, GgGratitudeJournal),
+        T("upl-2", "Stretch this feeling: tell someone about it, replay it, or note what made it happen. Shared and savored joys last longer.", Gg, GgSavoring),
         T("upl-3", "Riding a good wave is the perfect time to do good — kindness given when you’re up lifts someone else and keeps your own momentum going.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
+        T("upl-4", "Try a few small acts of kindness today. Research finds giving kindness reliably boosts your own happiness — do well by doing good.", Gg, GgKindness),
+    };
+
+    private static readonly Tip[] Confidence =
+    {
+        T("cnf-1", "When a harsh thought about yourself shows up, jot it down — then note the evidence against it. Seeing self-criticism on paper makes it easier to challenge.", "NHS — Raising low self-esteem", NhsSelfEsteem),
+        T("cnf-2", "Do one thing you’re good at today, however small. Playing to your strengths is a reliable way to rebuild confidence.", "NHS — Raising low self-esteem", NhsSelfEsteem),
+        T("cnf-3", "Set a small, reachable goal and let yourself finish it. Meeting goals — even tiny ones — steadily lifts self-esteem.", "NHS — Raising low self-esteem", NhsSelfEsteem),
+        T("cnf-4", "Take the win in. Savoring an accomplishment, instead of rushing past it, is what lets pride actually land.", Gg, GgSavoring),
+    };
+
+    private static readonly Tip[] Connection =
+    {
+        T("con-1", "Good relationships build a sense of belonging and self-worth. A small effort to nurture one today pays off more than it seems.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
+        T("con-2", "Try a few small acts of kindness — even for strangers. Giving kindness reliably lifts your own mood and sense of connection.", Gg, GgKindness),
+        T("con-3", "Feeling close to someone is worth protecting. Reaching out, listening well, or saying thanks keeps the bond strong.", "National Institute on Aging — Staying Connected", NiaLoneliness),
+        T("con-4", "Tell someone you trust what they mean to you. Naming gratitude out loud deepens the relationship for both of you.", Gg, GgGratitudeJournal),
     };
 
     private static readonly Tip[] Fallback =
     {
         T("gen-1", "Five simple habits support wellbeing: connect with others, stay active, learn something, give to others, and notice the present moment.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
         T("gen-2", "Acts of kindness and giving to others can boost your own sense of purpose — doing good really can help you do well.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
-        T("gen-3", "Caring for your mental health is an everyday practice. Small, steady steps add up.", "NIMH — Caring for Your Mental Health", NimhCaring),
-        T("gen-4", "However today went, getting your thoughts out — like you just did — is a real act of self-care.", "NIMH — Caring for Your Mental Health", NimhCaring),
+        T("gen-3", "Caring for your mental health is an everyday practice. Small, steady steps add up.", Nimh, NimhCaring),
+        T("gen-4", "However today went, getting your thoughts out — like you just did — is a real act of self-care.", Nimh, NimhCaring),
         T("gen-5", "A few quiet minutes of noticing your breath or surroundings counts. Mindful attention, even briefly, supports wellbeing.", "NHS — 5 steps to mental wellbeing", NhsFiveSteps),
+        T("gen-6", "Being kind to someone — even a stranger — reliably lifts your own mood. Doing good really can help you feel better.", Gg, GgKindness),
     };
 
     // ===================== Lookup =====================
@@ -172,26 +212,53 @@ public static class TipLibrary
         ["sad"] = Sad,
     };
 
-    /// <summary>Specific feelings (secondary/tertiary names, lowercased) → focused pools.</summary>
+    /// <summary>
+    /// Specific feelings (secondary/tertiary names, lowercased) → focused pools.
+    /// Feelings not listed here still get their parent's pool (for tertiary
+    /// feelings) and always their core-family pool via the cascade in Candidates.
+    /// </summary>
     private static readonly Dictionary<string, Tip[]> Specific = new()
     {
+        // Fear / anxiety
         ["anxious"] = Anxiety, ["worried"] = Anxiety, ["nervous"] = Anxiety,
-        ["scared"] = Anxiety, ["frightened"] = Anxiety, ["overwhelmed"] = Stress,
-        ["insecure"] = SelfCompassion, ["inadequate"] = SelfCompassion, ["inferior"] = SelfCompassion,
-        ["worthless"] = SelfCompassion, ["guilty"] = SelfCompassion, ["ashamed"] = SelfCompassion,
-        ["remorseful"] = SelfCompassion, ["embarrassed"] = SelfCompassion, ["judgmental"] = SelfCompassion,
+        ["scared"] = Anxiety, ["frightened"] = Anxiety, ["threatened"] = Anxiety, ["exposed"] = Anxiety,
+
+        // Low self-worth → self-esteem / confidence
+        ["insecure"] = Confidence, ["inadequate"] = Confidence, ["inferior"] = Confidence,
+        ["worthless"] = Confidence, ["weak"] = Confidence, ["insignificant"] = Confidence,
+
+        // Guilt / shame → self-compassion
+        ["guilty"] = SelfCompassion, ["ashamed"] = SelfCompassion, ["remorseful"] = SelfCompassion,
+        ["embarrassed"] = SelfCompassion, ["judgmental"] = SelfCompassion, ["disapproving"] = SelfCompassion,
+
+        // Loneliness / disconnection
         ["lonely"] = Lonely, ["isolated"] = Lonely, ["abandoned"] = Lonely, ["excluded"] = Lonely,
-        ["withdrawn"] = Lonely, ["distant"] = Lonely,
-        ["grief"] = Grief, ["despair"] = Grief, ["hurt"] = Grief,
-        ["tired"] = Sleep, ["sleepy"] = Sleep, ["unfocused"] = Sleep,
-        ["stressed"] = Stress, ["pressured"] = Stress, ["rushed"] = Stress,
+        ["withdrawn"] = Lonely, ["distant"] = Lonely, ["rejected"] = Lonely, ["persecuted"] = Lonely,
+
+        // Grief / loss / deep low
+        ["grief"] = Grief, ["despair"] = Grief, ["hurt"] = Grief, ["depressed"] = Grief,
+        ["powerless"] = Grief, ["empty"] = Grief,
+
+        // Depleted / stressed
+        ["overwhelmed"] = Stress, ["stressed"] = Stress, ["pressured"] = Stress, ["rushed"] = Stress,
         ["busy"] = Stress, ["out of control"] = Stress,
+        ["tired"] = Sleep, ["sleepy"] = Sleep, ["unfocused"] = Sleep,
         ["bored"] = Bored, ["indifferent"] = Bored, ["apathetic"] = Bored,
+
+        // Pride / capability → confidence
+        ["proud"] = Confidence, ["successful"] = Confidence, ["confident"] = Confidence,
+        ["respected"] = Confidence, ["powerful"] = Confidence, ["courageous"] = Confidence,
+
+        // Belonging / warmth → connection
+        ["accepted"] = Connection, ["valued"] = Connection, ["trusting"] = Connection,
+        ["loving"] = Connection, ["intimate"] = Connection, ["sensitive"] = Connection,
+
+        // Positive / upbeat → uplift
         ["hopeful"] = Uplift, ["optimistic"] = Uplift, ["inspired"] = Uplift,
         ["excited"] = Uplift, ["content"] = Uplift, ["peaceful"] = Uplift,
-        ["thankful"] = Uplift, ["loving"] = Uplift, ["proud"] = Uplift,
-        ["playful"] = Uplift, ["joyful"] = Uplift, ["curious"] = Uplift,
-        ["interested"] = Uplift, ["trusting"] = Uplift, ["accepted"] = Uplift,
+        ["thankful"] = Uplift, ["playful"] = Uplift, ["joyful"] = Uplift,
+        ["curious"] = Uplift, ["interested"] = Uplift, ["eager"] = Uplift,
+        ["energetic"] = Uplift, ["free"] = Uplift, ["creative"] = Uplift,
     };
 
     /// <summary>
