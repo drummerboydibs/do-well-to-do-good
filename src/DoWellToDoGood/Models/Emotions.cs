@@ -132,6 +132,31 @@ public static class EmotionCatalog
         return _allFeelings = list;
     }
 
+    private static IReadOnlyList<(string Name, string Definition)>? _gentleFeelings;
+
+    /// <summary>
+    /// Feelings with non-negative valence (gentle / neutral / positive), for the
+    /// word of the day — so a random day doesn't lead with a heavy feeling like
+    /// grief or despair. The harder feelings are still defined on the wheel.
+    /// </summary>
+    public static IReadOnlyList<(string Name, string Definition)> GentleFeelings()
+    {
+        if (_gentleFeelings is not null) return _gentleFeelings;
+        var list = new List<(string, string)>();
+        foreach (var c in Cores)
+        {
+            if (c.Valence >= 0) list.Add((c.Name, c.Definition));
+            foreach (var s in c.Secondaries)
+            {
+                if (s.Valence < 0) continue;
+                list.Add((s.Name, s.Definition));
+                foreach (var t in s.Tertiaries)
+                    list.Add((t.Name, t.Definition));
+            }
+        }
+        return _gentleFeelings = list;
+    }
+
     /// <summary>Look up any feeling by name (case-insensitive). Returns null for free text.</summary>
     public static EmotionInfo? Find(string? name)
     {

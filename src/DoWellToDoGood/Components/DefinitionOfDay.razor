@@ -15,10 +15,11 @@
     private string? _name;
     private string _definition = "";
 
-    // Feelings (from the wheel) plus supplementary wellbeing vocabulary, in a
-    // stable order so the per-day pick is deterministic.
+    // Gentler feelings (non-negative valence) plus supplementary wellbeing
+    // vocabulary, in a stable order so the per-day pick is deterministic — so a
+    // random day never leads the page with a heavy feeling like grief or despair.
     private static readonly IReadOnlyList<(string Name, string Definition)> Pool =
-        EmotionCatalog.AllFeelings().Concat(WellnessTerms.All).ToList();
+        EmotionCatalog.GentleFeelings().Concat(WellnessTerms.All).ToList();
 
     protected override void OnInitialized()
     {
