@@ -1,0 +1,330 @@
+@page "/recovery"
+@using System.Text.Json
+@using DoWellToDoGood.Models
+@using DoWellToDoGood.Services
+@inject AuthService Auth
+@inject CryptoService Crypto
+@inject SobrietyService Svc
+@inject IJSRuntime JS
+
+<PageTitle>Recovery — Do Well to Do Good</PageTitle>
+
+<div class="mx-auto max-w-3xl px-6 space-y-6">
+    <div class="space-y-1">
+        <h1>Recovery</h1>
+        <p class="text-muted m-0">
+            Count the time you're free from anything you're working to leave behind. Everything here —
+            the name, the date, the day count — is encrypted, so only you can ever see it.
+        </p>
+    </div>
+
+    @if (!Auth.IsSignedIn)
+    {
+        <div class="card text-center space-y-4">
+            <p class="text-muted m-0">Sign in to track recovery streaks — encrypted so only you can read them.</p>
+            <a class="btn btn-primary" href="signin">Sign in</a>
+        </div>
+    }
+    else if (!Crypto.IsUnlocked)
+    {
+        <VaultGate OnUnlocked="Load" />
+    }
+    else if (_loading)
+    {
+        <p class="text-muted" role="status">Decrypting your counters…</p>
+    }
+    else
+    {
+        @if (_counters.Count == 0)
+        {
+            <div class="card-soft text-muted">
+                No counters yet. Add your first one below — start from today, or backdate it to when your streak really began.
+            </div>
+        }
+
+        @foreach (var c in _counters)
+        {
+            <article class="card space-y-3">
+                @if (c.Editing)
+                {
+                    <div class="field m-0">
+                        <label class="label" for="edit-name-@c.Id">Name</label>
+                        <input id="edit-name-@c.Id" class="input" type="text" maxlength="80" @bind="c.EditName" />
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <label class="text-sm text-muted" for="edit-date-@c.Id">Clean since</label>
+                        <input id="edit-date-@c.Id" class="input !min-h-0 py-1 w-auto" type="date" max="@_today" @bind="c.EditDate" />
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="btn btn-primary !min-h-0 py-2" @onclick="() => SaveEdit(c)">Save</button>
+                        <button class="btn btn-ghost !min-h-0 py-2" @onclick="() => c.Editing = false">Cancel</button>
+                    </div>
+                }
+                else
+                {
+                    <header class="flex justify-between items-start gap-3 flex-wrap">
+                        <div class="min-w-0">
+                            <h2 class="m-0 text-lg font-bold">@c.Name</h2>
+                            <p class="m-0 mt-1">
+                                <span class="stat-num">@Days(c)</span>
+                                <span class="text-muted font-semibold">@(Days(c) == 1 ? "day" : "days") clean</span>
+                            </p>
+                            <p class="text-xs text-muted m-0">since @c.CleanSince.ToString("MMM d, yyyy")</p>
+                        </div>
+                        <div class="flex gap-2 flex-wrap">
+                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => StartEdit(c)">Edit</button>
+                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => StartReset(c)">I had a setback</button>
+                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteCounter(c)">Delete</button>
+                        </div>
+                    </header>
+
+                    @if (Milestones.IsMilestone(Days(c)))
+                    {
+                        <p class="m-0"><span class="badge">🎉 @Milestones.Label(Days(c)) milestone — well done!</span></p>
+                    }
+                    else
+                    {
+                        <p class="text-sm text-muted m-0">
+                            Next milestone: <span class="font-semibold text-ink">@Milestones.Label(Milestones.Next(Days(c)))</span>
+                            in @Milestones.DaysUntilNext(Days(c)) @(Milestones.DaysUntilNext(Days(c)) == 1 ? "day" : "days")
+                        </p>
+                    }
+
+                    <div class="flex gap-x-4 gap-y-1 flex-wrap text-sm text-muted">
+                        <span>Longest run: <span class="font-semibold text-ink">@Best(c) @(Best(c) == 1 ? "day" : "days")</span></span>
+                        @if (c.ResetCount > 0)
+                        {
+                            <span>Most recent run: <span class="font-semibold text-ink">@c.LastRunDays @(c.LastRunDays == 1 ? "day" : "days")</span></span>
+                            <span>Fresh starts: <span class="font-semibold text-ink">@c.ResetCount</span></span>
+                        }
+                    </div>
+
+                    @if (c.Resetting)
+                    {
+                        <div class="card-soft space-y-2">
+                            <p class="m-0 font-semibold">A setback is part of recovery, not the end of it. Let's start fresh — your progress so far is kept.</p>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <label class="text-sm text-muted" for="reset-date-@c.Id">Clean again since</label>
+                                <input id="reset-date-@c.Id" class="input !min-h-0 py-1 w-auto" type="date" max="@_today" @bind="c.ResetDate" />
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="btn btn-primary !min-h-0 py-2" @onclick="() => ConfirmReset(c)">Start fresh</button>
+                                <button class="btn btn-ghost !min-h-0 py-2" @onclick="() => c.Resetting = false">Cancel</button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (c.JustReset is not null)
+                    {
+                        <div class="card-soft space-y-2" role="status" style="background:linear-gradient(180deg, var(--color-primary-soft), var(--color-surface-2) 85%)">
+                            <p class="m-0">@c.JustReset.Text</p>
+                            <p class="m-0 text-sm text-muted">
+                                — <a href="@c.JustReset.SourceUrl" target="_blank" rel="noopener noreferrer" class="font-semibold">@c.JustReset.SourceName <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+                            </p>
+                            <p class="m-0"><a class="font-semibold" href="resources">Recovery resources →</a></p>
+                        </div>
+                    }
+                }
+            </article>
+        }
+
+        @* ---------- Add a counter ---------- *@
+        <section class="card space-y-4" aria-labelledby="add-h">
+            <h2 id="add-h" class="m-0 text-base font-bold">Add a counter</h2>
+            <div class="field m-0">
+                <label class="label" for="new-label">What are you leaving behind?</label>
+                <input id="new-label" class="input" type="text" maxlength="80" list="addiction-suggestions"
+                       placeholder="e.g. Alcohol" @bind="_newLabel" />
+                <datalist id="addiction-suggestions">
+                    <option value="Alcohol" />
+                    <option value="Nicotine" />
+                    <option value="Gambling" />
+                    <option value="Drugs" />
+                    <option value="Sugar" />
+                    <option value="Other" />
+                </datalist>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <label class="text-sm text-muted" for="new-date">Clean since</label>
+                <input id="new-date" class="input !min-h-0 py-1 w-auto" type="date" max="@_today" @bind="_newDate" />
+            </div>
+            @if (_addError is not null)
+            {
+                <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_addError</p>
+            }
+            <button class="btn btn-primary" disabled="@_adding" @onclick="AddCounter">@(_adding ? "Adding…" : "Add counter")</button>
+        </section>
+
+        @* ---------- Resources callout ---------- *@
+        <div class="card-soft flex items-center justify-between gap-3 flex-wrap">
+            <p class="m-0 text-muted">Need support right now? You don't have to do this alone.</p>
+            <a class="btn !min-h-0 py-2" href="resources">Recovery resources →</a>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private readonly string _today = DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
+
+    private List<CounterVm> _counters = new();
+
+    private string _newLabel = "";
+    private DateOnly _newDate = Today;
+    private bool _adding;
+    private string? _addError;
+
+    private sealed class CounterVm
+    {
+        public Guid Id;
+        public string Name = "";
+        public DateOnly CleanSince;
+        public int BestStreakDays;
+        public int LastRunDays;
+        public int ResetCount;
+        // UI state
+        public bool Editing;
+        public string EditName = "";
+        public DateOnly EditDate;
+        public bool Resetting;
+        public DateOnly ResetDate = DateOnly.FromDateTime(DateTime.Today);
+        public Encouragement? JustReset;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsSignedIn && Crypto.IsUnlocked) await Load();
+        else _loading = false;
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            var rows = await Svc.ListCountersAsync();
+            var list = new List<CounterVm>();
+            foreach (var r in rows)
+                list.Add(await Decrypt(r));
+            _counters = list;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task<CounterVm> Decrypt(SobrietyService.CounterRow r)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(await Crypto.DecryptAsync(r.Payload));
+            var e = doc.RootElement;
+            return new CounterVm
+            {
+                Id = r.Id,
+                Name = e.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
+                CleanSince = e.TryGetProperty("cleanSince", out var cs) && DateOnly.TryParse(cs.GetString(), out var d) ? d : Today,
+                BestStreakDays = e.TryGetProperty("best", out var b) && b.TryGetInt32(out var bi) ? bi : 0,
+                LastRunDays = e.TryGetProperty("last", out var l) && l.TryGetInt32(out var li) ? li : 0,
+                ResetCount = e.TryGetProperty("resets", out var rc) && rc.TryGetInt32(out var ri) ? ri : 0,
+            };
+        }
+        catch
+        {
+            return new CounterVm { Id = r.Id, Name = "⚠ Couldn't decrypt this counter", CleanSince = Today };
+        }
+    }
+
+    private static string Payload(string name, DateOnly cleanSince, int best, int last, int resets) =>
+        JsonSerializer.Serialize(new
+        {
+            name,
+            cleanSince = cleanSince.ToString("yyyy-MM-dd"),
+            best,
+            last,
+            resets
+        });
+
+    private static int Days(CounterVm c) => Milestones.DaysClean(c.CleanSince, Today);
+    private static int Best(CounterVm c) => Math.Max(c.BestStreakDays, Days(c));
+
+    private async Task AddCounter()
+    {
+        _addError = null;
+        var name = _newLabel.Trim();
+        if (name.Length == 0) { _addError = "Give it a name — what are you leaving behind?"; return; }
+        if (_newDate > Today) { _addError = "The clean-since date can't be in the future."; return; }
+        _adding = true;
+        try
+        {
+            var blob = await Crypto.EncryptAsync(Payload(name, _newDate, 0, 0, 0));
+            await Svc.InsertCounterAsync(blob);
+            _newLabel = "";
+            _newDate = Today;
+            await Load();
+        }
+        catch
+        {
+            _addError = "Couldn't save. Check your connection and try again.";
+        }
+        finally
+        {
+            _adding = false;
+        }
+    }
+
+    private void StartEdit(CounterVm c)
+    {
+        c.EditName = c.Name;
+        c.EditDate = c.CleanSince;
+        c.JustReset = null;
+        c.Editing = true;
+    }
+
+    private async Task SaveEdit(CounterVm c)
+    {
+        if (string.IsNullOrWhiteSpace(c.EditName) || c.EditDate > Today) return;
+        var blob = await Crypto.EncryptAsync(Payload(c.EditName.Trim(), c.EditDate, c.BestStreakDays, c.LastRunDays, c.ResetCount));
+        await Svc.UpdateCounterAsync(c.Id, blob);
+        c.Name = c.EditName.Trim();
+        c.CleanSince = c.EditDate;
+        c.Editing = false;
+    }
+
+    private void StartReset(CounterVm c)
+    {
+        c.ResetDate = Today;
+        c.JustReset = null;
+        c.Resetting = true;
+    }
+
+    // A reset banks the streak they'd built (as both the "most recent run" and,
+    // if it's a new record, the "longest run"), bumps the fresh-start count, and
+    // restarts from the chosen date — never erasing the progress.
+    private async Task ConfirmReset(CounterVm c)
+    {
+        if (c.ResetDate > Today) return;
+        var endedRun = Days(c);
+        var newBest = Math.Max(c.BestStreakDays, endedRun);
+        var newResets = c.ResetCount + 1;
+        var blob = await Crypto.EncryptAsync(Payload(c.Name, c.ResetDate, newBest, endedRun, newResets));
+        await Svc.UpdateCounterAsync(c.Id, blob);
+        c.BestStreakDays = newBest;
+        c.LastRunDays = endedRun;
+        c.ResetCount = newResets;
+        c.CleanSince = c.ResetDate;
+        c.Resetting = false;
+        c.JustReset = RecoveryEncouragement.Random();
+    }
+
+    private async Task DeleteCounter(CounterVm c)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete the \"{c.Name}\" counter? This can't be undone."))
+            return;
+        await Svc.DeleteCounterAsync(c.Id);
+        _counters = _counters.Where(x => x.Id != c.Id).ToList();
+    }
+}

@@ -1,0 +1,103 @@
+@using System.Text.Json
+@using DoWellToDoGood.Models
+@using DoWellToDoGood.Services
+@implements IDisposable
+@inject AuthService Auth
+@inject CryptoService Crypto
+@inject SobrietyService Svc
+
+@* A compact, read-only view of the user's recovery counters for the top of the
+   Home, Journal, Therapy, and Account pages. Renders nothing when signed out or
+   with no counters. Because the payload is encrypted, a locked vault can still
+   see *how many* counters exist (to offer an unlock nudge) but not their
+   contents. Full management lives on the Recovery page. *@
+@if (Auth.IsSignedIn && _rowCount > 0)
+{
+    @if (!Crypto.IsUnlocked)
+    {
+        <div class="card-soft flex items-center justify-between gap-3 flex-wrap mb-6">
+            <p class="m-0 text-muted">🌱 Unlock to see your recovery @(_rowCount == 1 ? "streak" : "streaks").</p>
+            <a class="btn !min-h-0 py-2" href="recovery">Unlock &amp; view →</a>
+        </div>
+    }
+    else if (_items.Count > 0)
+    {
+        <div class="card space-y-3 mb-6">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+                <h2 class="m-0 text-base font-bold">Your recovery</h2>
+                <a class="text-sm font-semibold" href="recovery">Manage →</a>
+            </div>
+            <ul class="space-y-2 m-0 pl-0" style="list-style:none">
+                @foreach (var it in _items)
+                {
+                    <li class="flex items-baseline justify-between gap-3 flex-wrap rounded-bubble bg-surface-2 border border-line p-3">
+                        <span class="font-semibold">@it.Name</span>
+                        <span class="text-sm whitespace-nowrap">
+                            <span class="font-bold">@it.Days</span> <span class="text-muted">@(it.Days == 1 ? "day" : "days")</span>
+                            @if (it.Milestone)
+                            {
+                                <span class="badge ml-2">🎉 @it.MilestoneLabel</span>
+                            }
+                        </span>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+}
+
+@code {
+    private int _rowCount;
+    private List<Item> _items = new();
+    private sealed record Item(string Name, int Days, bool Milestone, string MilestoneLabel);
+
+    protected override void OnInitialized()
+    {
+        Auth.Changed += OnChanged;
+        Crypto.Changed += OnChanged;
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (!Auth.IsSignedIn) { _rowCount = 0; _items = new(); return; }
+        try
+        {
+            var rows = await Svc.ListCountersAsync();
+            _rowCount = rows.Count;
+
+            if (!Crypto.IsUnlocked) { _items = new(); return; }
+
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var items = new List<Item>();
+            foreach (var r in rows)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(await Crypto.DecryptAsync(r.Payload));
+                    var e = doc.RootElement;
+                    var name = e.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+                    var clean = e.TryGetProperty("cleanSince", out var c) && DateOnly.TryParse(c.GetString(), out var d) ? d : today;
+                    var days = Milestones.DaysClean(clean, today);
+                    items.Add(new Item(name, days, Milestones.IsMilestone(days), Milestones.Label(days)));
+                }
+                catch { /* skip a counter that won't decrypt */ }
+            }
+            _items = items;
+        }
+        catch { _rowCount = 0; _items = new(); }
+    }
+
+    private async void OnChanged()
+    {
+        await LoadAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Auth.Changed -= OnChanged;
+        Crypto.Changed -= OnChanged;
+    }
+}
