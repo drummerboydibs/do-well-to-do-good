@@ -7,6 +7,7 @@
 @inject EntriesService Entries
 @inject TipHistoryService TipHistory
 @inject StatsService Stats
+@inject FaithService Faith
 
 <PageTitle>Write — Do Well to Do Good</PageTitle>
 
@@ -49,6 +50,21 @@
                 <p class="text-muted text-xs max-w-lg mx-auto">General wellbeing information, not medical advice. If you’re struggling, please reach out to a professional or someone you trust.</p>
             }
 
+            @if (_faithPassage is not null)
+            {
+                <div class="mx-auto my-6 max-w-lg rounded-bubble-lg border border-line p-5 text-left"
+                     style="background:linear-gradient(180deg, var(--color-secondary-soft), var(--color-surface) 82%)">
+                    <p class="uppercase tracking-wider text-xs font-bold m-0 mb-2" style="color:var(--color-secondary-hover)">
+                        From your tradition · @FaithLibrary.DisplayName(_faithPassage.Tradition)
+                    </p>
+                    <p class="m-0 text-lg leading-relaxed">@_faithPassage.Text</p>
+                    <p class="m-0 mt-3 text-sm text-muted">
+                        — @_faithPassage.Reference (@_faithPassage.Version) ·
+                        <a href="@_faithPassage.SourceUrl" target="_blank" rel="noopener noreferrer" class="font-semibold">@_faithPassage.SourceName <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+                    </p>
+                </div>
+            }
+
             <p class="mt-8"><button class="btn btn-primary btn-lg" @onclick="Reset">Write something new</button></p>
         </div>
     }
@@ -57,6 +73,7 @@
         <SobrietyCounters />
         <OpenGoalsReminder />
         <DefinitionOfDay />
+        <FaithPassageOfDay Expandable="true" />
 
         <div class="card">
             <h1>What’s on your mind?</h1>
@@ -166,7 +183,10 @@
     private string? _saveError;
     private Tip? _tip;
     private EmotionInfo? _tipEmotion;
+    private Passage? _faithPassage;
     private int _releaseKey;
+
+    protected override async Task OnInitializedAsync() => await Faith.LoadAsync();
 
     // After releasing/saving, the whole card swaps to the confirmation. Move focus
     // to its heading so keyboard users land there and screen readers announce it
@@ -200,6 +220,7 @@
         if (!CanSubmit) return;
 
         _tip = await PickTipAsync();
+        _faithPassage = PickFaithPassage();
 
         // Count the release (a number and a date only — never the words themselves).
         await Stats.RecordShoutAsync();
@@ -220,6 +241,19 @@
         _savedToJournal = false;
         _tip = null;
         _tipEmotion = null;
+        _faithPassage = null;
+    }
+
+    // A cited passage from the user's tradition (if any), matched to this entry's
+    // mood. With several selected, rotate which one appears by day. Empty for
+    // guests / when locked / when nothing is selected.
+    private Passage? PickFaithPassage()
+    {
+        var stocked = Faith.Selected.Where(FaithLibrary.Available.Contains).ToList();
+        if (stocked.Count == 0) return null;
+        var day = DateOnly.FromDateTime(DateTime.Today).DayNumber;
+        var tradition = stocked[day % stocked.Count];
+        return FaithLibrary.PickForEmotion(tradition, _tipEmotion);
     }
 
     private void OnVaultUnlocked() => _showVault = false;
@@ -258,6 +292,7 @@
             await Entries.InsertEntryAsync(blob);
 
             _tip = await PickTipAsync();
+            _faithPassage = PickFaithPassage();
 
             _emotion = string.Empty;
             _body = string.Empty;

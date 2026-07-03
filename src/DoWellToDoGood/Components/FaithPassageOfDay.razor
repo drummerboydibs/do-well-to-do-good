@@ -1,0 +1,66 @@
+@using DoWellToDoGood.Models
+@using DoWellToDoGood.Services
+@implements IDisposable
+@inject FaithService Faith
+
+@* The passage of the day for the user's selected tradition(s), rotating across
+   them by day. Only appears when signed in, vault unlocked, and at least one
+   tradition is selected (the selection is encrypted, so it's unreadable while
+   locked). On the Write page it's an expandable card so it doesn't crowd the
+   writing space. *@
+@if (_passage is not null)
+{
+    RenderFragment body =@<div>
+        <p class="m-0 leading-relaxed">@_passage.Text</p>
+        <p class="m-0 mt-2 text-sm text-muted">
+            — @_passage.Reference (@_passage.Version) ·
+            <a href="@_passage.SourceUrl" target="_blank" rel="noopener noreferrer" class="font-semibold">@_passage.SourceName <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+        </p>
+    </div>;
+
+    if (Expandable)
+    {
+        <details class="card-soft mb-6">
+            <summary class="cursor-pointer font-semibold" style="color:var(--color-primary-hover)">
+                A passage for today <span class="text-muted font-normal">· @FaithLibrary.DisplayName(_passage.Tradition)</span>
+            </summary>
+            <div class="mt-3">@body</div>
+        </details>
+    }
+    else
+    {
+        <div class="card-soft mb-6">
+            <p class="text-xs font-bold uppercase tracking-wider m-0 mb-1" style="color:var(--color-primary-hover)">
+                A passage for today · @FaithLibrary.DisplayName(_passage.Tradition)
+            </p>
+            @body
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public bool Expandable { get; set; }
+
+    private Passage? _passage;
+
+    protected override void OnInitialized() => Faith.Changed += OnChanged;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Faith.LoadAsync();
+        Compute();
+    }
+
+    private void Compute() =>
+        _passage = Faith.Selected.Count > 0
+            ? FaithLibrary.Daily(Faith.Selected, DateOnly.FromDateTime(DateTime.Today))
+            : null;
+
+    private void OnChanged()
+    {
+        Compute();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Faith.Changed -= OnChanged;
+}

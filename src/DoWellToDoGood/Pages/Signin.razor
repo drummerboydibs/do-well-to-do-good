@@ -1,10 +1,12 @@
 @page "/signin"
+@using DoWellToDoGood.Models
 @using DoWellToDoGood.Services
 @inject AuthService Auth
 @inject CryptoService Crypto
 @inject EntriesService Store
 @inject StatsService Stats
 @inject ThemeService Theme
+@inject FaithService Faith
 @inject NavigationManager Nav
 
 <PageTitle>@(Auth.IsSignedIn ? "Account" : "Sign in") — Do Well to Do Good</PageTitle>
@@ -86,6 +88,37 @@
                     </fieldset>
                 </section>
 
+                <section aria-labelledby="faith-heading" class="space-y-2">
+                    <h2 id="faith-heading" class="text-base font-bold m-0">Faith &amp; belief <span class="text-muted font-normal text-sm">(optional)</span></h2>
+                    <p class="text-muted text-sm m-0">
+                        Weave gently-worded, cited passages from a tradition into your tips and home page.
+                        Your choice is encrypted — only you can see it.
+                    </p>
+                    @if (!Crypto.IsUnlocked)
+                    {
+                        <VaultGate OnUnlocked="OnFaithUnlocked" />
+                    }
+                    else
+                    {
+                        <div class="space-y-2 pt-1">
+                            @foreach (var t in AllTraditions)
+                            {
+                                var available = FaithLibrary.Available.Contains(t);
+                                <label class="flex items-center gap-2 @(available ? "" : "opacity-60")">
+                                    <input type="checkbox" disabled="@(!available)"
+                                           checked="@Faith.Selected.Contains(t)"
+                                           @onchange="e => ToggleTradition(t, (bool)e.Value!)" />
+                                    <span class="font-semibold">@FaithLibrary.DisplayName(t)</span>
+                                    @if (!available)
+                                    {
+                                        <span class="text-xs text-muted">(coming soon)</span>
+                                    }
+                                </label>
+                            }
+                        </div>
+                    }
+                </section>
+
                 <div class="space-y-3">
                     <a class="btn btn-primary btn-block" href="journal">Start writing</a>
                     <a class="btn btn-block" href="entries">Open my journal</a>
@@ -153,7 +186,27 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsSignedIn) await LoadStatsAsync();
+        if (Auth.IsSignedIn)
+        {
+            await LoadStatsAsync();
+            await Faith.LoadAsync();
+        }
+    }
+
+    private static readonly FaithTradition[] AllTraditions = Enum.GetValues<FaithTradition>();
+
+    private async Task ToggleTradition(FaithTradition t, bool on)
+    {
+        var set = Faith.Selected.ToList();
+        if (on) { if (!set.Contains(t)) set.Add(t); }
+        else set.Remove(t);
+        await Faith.SetAsync(set);
+    }
+
+    private async Task OnFaithUnlocked()
+    {
+        await Faith.LoadAsync(force: true);
+        StateHasChanged();
     }
 
     private async Task LoadStatsAsync()
