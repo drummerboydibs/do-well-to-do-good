@@ -13,6 +13,7 @@ builder.Services.AddScoped<CryptoService>();
 builder.Services.AddScoped<EntriesService>();
 builder.Services.AddScoped<TherapyService>();
 builder.Services.AddScoped<SobrietyService>();
+builder.Services.AddScoped<FaithService>();
 builder.Services.AddScoped<TipHistoryService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<StatsService>();
