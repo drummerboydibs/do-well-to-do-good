@@ -89,9 +89,24 @@ public class FaithLibraryTests
     [Fact]
     public void PickForEmotion_UnstockedTradition_ReturnsNull()
     {
-        // Hinduism has no content yet.
-        Assert.Null(FaithLibrary.PickForEmotion(FaithTradition.Hinduism, null));
-        Assert.Null(FaithLibrary.PickForEmotion(FaithTradition.Hinduism, EmotionCatalog.Find("Happy")));
+        // An unknown/unstocked tradition value must fall through to null.
+        var unknown = (FaithTradition)99;
+        Assert.Null(FaithLibrary.PickForEmotion(unknown, null));
+        Assert.Null(FaithLibrary.PickForEmotion(unknown, EmotionCatalog.Find("Happy")));
+    }
+
+    [Fact]
+    public void PickForEmotion_Hinduism_ReturnsAGitaPassage()
+    {
+        // "Overwhelmed" is under the Bad core → the Hindu "bad" pool.
+        var overwhelmed = EmotionCatalog.Find("Overwhelmed");
+        for (var i = 0; i < Iterations; i++)
+        {
+            var p = FaithLibrary.PickForEmotion(FaithTradition.Hinduism, overwhelmed);
+            Assert.NotNull(p);
+            Assert.Equal(FaithTradition.Hinduism, p!.Tradition);
+            Assert.StartsWith("hin-", p.Id);
+        }
     }
 
     [Fact]
@@ -145,9 +160,9 @@ public class FaithLibraryTests
     [Fact]
     public void Daily_SkipsUnstockedSelections()
     {
-        // Hinduism has no content yet; with both selected it must still return the
-        // stocked (Christian) passage rather than null.
-        var p = FaithLibrary.Daily(new[] { FaithTradition.Hinduism, FaithTradition.Christianity }, new DateOnly(2026, 7, 3));
+        // An unknown/unstocked tradition must be skipped; the stocked (Christian)
+        // one is still returned rather than null.
+        var p = FaithLibrary.Daily(new[] { (FaithTradition)99, FaithTradition.Christianity }, new DateOnly(2026, 7, 3));
         Assert.NotNull(p);
         Assert.Equal(FaithTradition.Christianity, p!.Tradition);
     }
