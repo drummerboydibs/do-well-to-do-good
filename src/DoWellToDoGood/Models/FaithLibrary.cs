@@ -33,18 +33,19 @@ public record Passage(
 /// Content is curated to be wellness-supportive and respectful — comfort, hope,
 /// patience, gratitude, compassion — and never polemical toward any group. All
 /// translations are public domain: Christianity (KJV), Islam (Pickthall's
-/// "Meaning of the Glorious Koran"), Judaism (JPS 1917). Hinduism is not stocked
-/// yet. Text and verse numbering were verified against Bible Gateway, Quran.com,
-/// and Sefaria.
+/// "Meaning of the Glorious Koran"), Judaism (JPS 1917), Hinduism (Annie Besant's
+/// Bhagavad Gita). Text and verse numbering were verified against Bible Gateway,
+/// Quran.com, Sefaria, and Wikisource.
 /// </summary>
 public static class FaithLibrary
 {
-    /// <summary>Traditions that currently have content. The Account selector greys out the rest.</summary>
+    /// <summary>Traditions that currently have content. The Account selector greys out any others.</summary>
     public static readonly IReadOnlyList<FaithTradition> Available = new[]
     {
         FaithTradition.Christianity,
         FaithTradition.Islam,
         FaithTradition.Judaism,
+        FaithTradition.Hinduism,
     };
 
     public static string DisplayName(FaithTradition t) => t switch
@@ -72,6 +73,11 @@ public static class FaithLibrary
         new(id, FaithTradition.Judaism, text, reference, "JPS 1917",
             "The Holy Scriptures (JPS 1917) · Sefaria",
             $"https://www.sefaria.org/{reference.Replace(" ", ".").Replace(":", ".")}");
+
+    private static Passage Gita(string id, string text, int chapter, int verse) =>
+        new(id, FaithTradition.Hinduism, text, $"Bhagavad Gita {chapter}:{verse}", "tr. Annie Besant",
+            "The Bhagavad Gita, tr. Besant · Wikisource",
+            $"https://en.wikisource.org/wiki/Bhagavad-Gita_(Besant_4th)/Discourse_{chapter}");
 
     // ===================== Christianity (KJV) =====================
 
@@ -253,6 +259,58 @@ public static class FaithLibrary
         ["guilty"] = JudGuilt, ["ashamed"] = JudGuilt, ["remorseful"] = JudGuilt,
     };
 
+    // ===================== Hinduism (Bhagavad Gita, tr. Besant) =====================
+
+    private static readonly Passage[] HinGeneral =
+    {
+        Gita("hin-gen-1", "Let him raise the self by the Self and not let the self become depressed; for verily is the Self the friend of the self, and also the Self the self's enemy.", 6, 5),
+        Gita("hin-gen-2", "To those men who worship Me alone thinking of no other, to those ever harmonious, I bring full security.", 9, 22),
+    };
+
+    private static readonly Passage[] HinFearful =
+    {
+        Gita("hin-fear-1", "Thy business is with the action only, never with its fruits; so let not the fruit of action be thy motive, nor be thou to inaction attached.", 2, 47),
+    };
+
+    private static readonly Passage[] HinSad =
+    {
+        Gita("hin-sad-1", "Abandoning all duties come unto Me alone for shelter; sorrow not, I will liberate thee from all sins.", 18, 66),
+    };
+
+    private static readonly Passage[] HinBad =
+    {
+        Gita("hin-bad-1", "Perform action, O Dhananjaya, dwelling in union with the divine, renouncing attachments, and balanced evenly in success and failure: equilibrium is called yoga.", 2, 48),
+    };
+
+    private static readonly Passage[] HinAngry =
+    {
+        Gita("hin-ang-1", "He who is able to endure here on earth, ere he be liberated from the body, the force born from desire and passion, he is harmonised, he is a happy man.", 5, 23),
+    };
+
+    private static readonly Passage[] HinHappy =
+    {
+        Gita("hin-hap-1", "He attaineth Peace, into whom all desires flow as rivers flow into the ocean, which is filled with water, but remaineth unmoved — not he who desireth desires.", 2, 70),
+    };
+
+    private static readonly Passage[] HinLonely =
+    {
+        Gita("hin-lon-1", "The Lord dwelleth in the hearts of all beings, O Arjuna.", 18, 61),
+    };
+
+    private static readonly Dictionary<string, Passage[]> HinByCore = new()
+    {
+        ["happy"] = HinHappy,
+        ["sad"] = HinSad,
+        ["fearful"] = HinFearful,
+        ["bad"] = HinBad,
+        ["angry"] = HinAngry,
+    };
+
+    private static readonly Dictionary<string, Passage[]> HinSpecific = new()
+    {
+        ["lonely"] = HinLonely, ["isolated"] = HinLonely, ["abandoned"] = HinLonely,
+    };
+
     // ===================== Lookup =====================
 
     private sealed record TraditionContent(Passage[] General, Dictionary<string, Passage[]> ByCore, Dictionary<string, Passage[]> Specific);
@@ -262,6 +320,7 @@ public static class FaithLibrary
         [FaithTradition.Christianity] = new(ChrGeneral, ChrByCore, ChrSpecific),
         [FaithTradition.Islam] = new(IslamGeneral, IslamByCore, IslamSpecific),
         [FaithTradition.Judaism] = new(JudGeneral, JudByCore, JudSpecific),
+        [FaithTradition.Hinduism] = new(HinGeneral, HinByCore, HinSpecific),
     };
 
     /// <summary>
