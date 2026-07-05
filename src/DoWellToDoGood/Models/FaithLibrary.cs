@@ -31,13 +31,21 @@ public record Passage(
 /// user's faith and IP to a third party) and every passage cites its source.
 ///
 /// Content is curated to be wellness-supportive and respectful — comfort, hope,
-/// patience, gratitude, compassion — and never polemical toward any group. Only
-/// Christianity (KJV, public domain) is stocked so far; more traditions follow.
+/// patience, gratitude, compassion — and never polemical toward any group. All
+/// translations are public domain: Christianity (KJV), Islam (Pickthall's
+/// "Meaning of the Glorious Koran"), Judaism (JPS 1917). Hinduism is not stocked
+/// yet. Text and verse numbering were verified against Bible Gateway, Quran.com,
+/// and Sefaria.
 /// </summary>
 public static class FaithLibrary
 {
     /// <summary>Traditions that currently have content. The Account selector greys out the rest.</summary>
-    public static readonly IReadOnlyList<FaithTradition> Available = new[] { FaithTradition.Christianity };
+    public static readonly IReadOnlyList<FaithTradition> Available = new[]
+    {
+        FaithTradition.Christianity,
+        FaithTradition.Islam,
+        FaithTradition.Judaism,
+    };
 
     public static string DisplayName(FaithTradition t) => t switch
     {
@@ -48,12 +56,22 @@ public static class FaithLibrary
         _ => t.ToString(),
     };
 
-    // Deep-links to a reputable, full-text public-domain KJV so each citation is verifiable.
+    // ---- Per-translation factories (build the citation + a verifiable source link) ----
+
     private static string Bg(string reference) =>
         $"https://www.biblegateway.com/passage/?search={Uri.EscapeDataString(reference)}&version=KJV";
 
     private static Passage Kjv(string id, string text, string reference) =>
         new(id, FaithTradition.Christianity, text, reference, "KJV", "King James Version · Bible Gateway", Bg(reference));
+
+    private static Passage Pk(string id, string text, int surah, int ayah, string surahName) =>
+        new(id, FaithTradition.Islam, text, $"Qur'an {surah}:{ayah} ({surahName})", "Pickthall",
+            "The Meaning of the Glorious Koran, tr. Pickthall · Quran.com", $"https://quran.com/{surah}/{ayah}");
+
+    private static Passage Jps(string id, string text, string reference) =>
+        new(id, FaithTradition.Judaism, text, reference, "JPS 1917",
+            "The Holy Scriptures (JPS 1917) · Sefaria",
+            $"https://www.sefaria.org/{reference.Replace(" ", ".").Replace(":", ".")}");
 
     // ===================== Christianity (KJV) =====================
 
@@ -104,7 +122,6 @@ public static class FaithLibrary
         Kjv("chr-hap-3", "Every good gift and every perfect gift is from above, and cometh down from the Father of lights.", "James 1:17"),
     };
 
-    // Specific-feeling pools (loneliness, guilt/shame).
     private static readonly Passage[] ChrLonely =
     {
         Kjv("chr-lon-1", "Be strong and of a good courage, fear not, nor be afraid of them: for the LORD thy God, he it is that doth go with thee; he will not fail thee, nor forsake thee.", "Deuteronomy 31:6"),
@@ -132,13 +149,120 @@ public static class FaithLibrary
         ["guilty"] = ChrGuilt, ["ashamed"] = ChrGuilt, ["remorseful"] = ChrGuilt,
     };
 
-    private static Passage[] General(FaithTradition t) => t switch
+    // ===================== Islam (Pickthall) =====================
+
+    private static readonly Passage[] IslamGeneral =
     {
-        FaithTradition.Christianity => ChrGeneral,
-        _ => Array.Empty<Passage>(),
+        Pk("islam-gen-1", "Who have believed and whose hearts have rest in the remembrance of Allah. Verily in the remembrance of Allah do hearts find rest!", 13, 28, "Ar-Ra'd"),
+        Pk("islam-gen-2", "Therefore remember Me, I will remember you. Give thanks to Me, and reject not Me.", 2, 152, "Al-Baqarah"),
     };
 
-    // ===================== Selection helpers =====================
+    private static readonly Passage[] IslamFearful =
+    {
+        Pk("islam-fear-1", "Allah tasketh not a soul beyond its scope.", 2, 286, "Al-Baqarah"),
+    };
+
+    private static readonly Passage[] IslamSad =
+    {
+        Pk("islam-sad-1", "Despair not of the mercy of Allah, Who forgiveth all sins. Lo! He is the Forgiving, the Merciful.", 39, 53, "Az-Zumar"),
+    };
+
+    private static readonly Passage[] IslamBad =
+    {
+        Pk("islam-bad-1", "O ye who believe! Seek help in steadfastness and prayer. Lo! Allah is with the steadfast.", 2, 153, "Al-Baqarah"),
+    };
+
+    private static readonly Passage[] IslamAngry =
+    {
+        Pk("islam-ang-1", "Those who spend (of that which Allah hath given them) in ease and in adversity, those who control their wrath and are forgiving toward mankind; Allah loveth the good.", 3, 134, "Aal 'Imran"),
+    };
+
+    private static readonly Passage[] IslamHappy =
+    {
+        Pk("islam-hap-1", "And when your Lord proclaimed: If ye give thanks, I will give you more.", 14, 7, "Ibrahim"),
+    };
+
+    private static readonly Passage[] IslamLonely =
+    {
+        Pk("islam-lon-1", "Grieve not! Lo! Allah is with us.", 9, 40, "At-Tawbah"),
+    };
+
+    private static readonly Dictionary<string, Passage[]> IslamByCore = new()
+    {
+        ["happy"] = IslamHappy,
+        ["sad"] = IslamSad,
+        ["fearful"] = IslamFearful,
+        ["bad"] = IslamBad,
+        ["angry"] = IslamAngry,
+    };
+
+    private static readonly Dictionary<string, Passage[]> IslamSpecific = new()
+    {
+        ["lonely"] = IslamLonely, ["isolated"] = IslamLonely, ["abandoned"] = IslamLonely,
+    };
+
+    // ===================== Judaism (JPS 1917) =====================
+
+    private static readonly Passage[] JudGeneral =
+    {
+        Jps("jud-gen-1", "It hath been told thee, O man, what is good, And what the LORD doth require of thee: Only to do justly, and to love mercy, and to walk humbly with thy God.", "Micah 6:8"),
+        Jps("jud-gen-2", "Trust in the LORD with all thy heart, And lean not upon thine own understanding. In all thy ways acknowledge Him, And He will direct thy paths.", "Proverbs 3:5-6"),
+    };
+
+    private static readonly Passage[] JudFearful =
+    {
+        Jps("jud-fear-1", "Fear thou not, for I am with thee, Be not dismayed, for I am thy God; I strengthen thee, yea, I help thee; Yea, I uphold thee with My victorious right hand.", "Isaiah 41:10"),
+    };
+
+    private static readonly Passage[] JudSad =
+    {
+        Jps("jud-sad-1", "The LORD is nigh unto them that are of a broken heart, And saveth such as are of a contrite spirit.", "Psalms 34:19"),
+    };
+
+    private static readonly Passage[] JudBad =
+    {
+        Jps("jud-bad-1", "But they that wait for the LORD shall renew their strength; They shall mount up with wings as eagles; They shall run, and not be weary; They shall walk, and not faint.", "Isaiah 40:31"),
+    };
+
+    private static readonly Passage[] JudAngry =
+    {
+        Jps("jud-ang-1", "A soft answer turneth away wrath; But a grievous word stirreth up anger.", "Proverbs 15:1"),
+    };
+
+    private static readonly Passage[] JudLonely =
+    {
+        Jps("jud-lon-1", "Be strong and of good courage, fear not, nor be affrighted at them; for the LORD thy God, He it is that doth go with thee; He will not fail thee, nor forsake thee.", "Deuteronomy 31:6"),
+    };
+
+    private static readonly Passage[] JudGuilt =
+    {
+        Jps("jud-guilt-1", "As far as the east is from the west, So far hath He removed our transgressions from us.", "Psalms 103:12"),
+    };
+
+    private static readonly Dictionary<string, Passage[]> JudByCore = new()
+    {
+        ["sad"] = JudSad,
+        ["fearful"] = JudFearful,
+        ["bad"] = JudBad,
+        ["angry"] = JudAngry,
+    };
+
+    private static readonly Dictionary<string, Passage[]> JudSpecific = new()
+    {
+        ["lonely"] = JudLonely, ["isolated"] = JudLonely, ["abandoned"] = JudLonely,
+        ["guilty"] = JudGuilt, ["ashamed"] = JudGuilt, ["remorseful"] = JudGuilt,
+    };
+
+    // ===================== Lookup =====================
+
+    private sealed record TraditionContent(Passage[] General, Dictionary<string, Passage[]> ByCore, Dictionary<string, Passage[]> Specific);
+
+    private static readonly Dictionary<FaithTradition, TraditionContent> Content = new()
+    {
+        [FaithTradition.Christianity] = new(ChrGeneral, ChrByCore, ChrSpecific),
+        [FaithTradition.Islam] = new(IslamGeneral, IslamByCore, IslamSpecific),
+        [FaithTradition.Judaism] = new(JudGeneral, JudByCore, JudSpecific),
+    };
 
     /// <summary>
     /// A passage matched to a feeling for one tradition, cascading specific pool →
@@ -158,17 +282,17 @@ public static class FaithLibrary
 
     private static List<Passage> Candidates(FaithTradition tradition, EmotionInfo? e)
     {
-        if (tradition != FaithTradition.Christianity) return new();
+        if (!Content.TryGetValue(tradition, out var c)) return new();
 
         var list = new List<Passage>();
         if (e is not null)
         {
-            if (ChrSpecific.TryGetValue(e.Name.ToLowerInvariant(), out var specific))
+            if (c.Specific.TryGetValue(e.Name.ToLowerInvariant(), out var specific))
                 list.AddRange(specific);
-            if (ChrByCore.TryGetValue(e.CoreKey, out var core))
+            if (c.ByCore.TryGetValue(e.CoreKey, out var core))
                 list.AddRange(core);
         }
-        if (list.Count == 0) list.AddRange(ChrGeneral);
+        if (list.Count == 0) list.AddRange(c.General);
         return list.Distinct().ToList();
     }
 
@@ -179,12 +303,12 @@ public static class FaithLibrary
     /// </summary>
     public static Passage? Daily(IReadOnlyList<FaithTradition> selected, DateOnly date)
     {
-        var stocked = selected.Where(t => General(t).Length > 0).ToList();
+        var stocked = selected.Where(t => Content.ContainsKey(t) && Content[t].General.Length > 0).ToList();
         if (stocked.Count == 0) return null;
 
         var day = date.DayNumber;
         var tradition = stocked[(day % stocked.Count + stocked.Count) % stocked.Count];
-        var pool = General(tradition);
+        var pool = Content[tradition].General;
         // Advance through the pool on a slower cycle than the tradition rotation.
         var idx = (day / stocked.Count) % pool.Length;
         return pool[idx];

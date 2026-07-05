@@ -89,8 +89,35 @@ public class FaithLibraryTests
     [Fact]
     public void PickForEmotion_UnstockedTradition_ReturnsNull()
     {
-        Assert.Null(FaithLibrary.PickForEmotion(FaithTradition.Islam, null));
-        Assert.Null(FaithLibrary.PickForEmotion(FaithTradition.Judaism, EmotionCatalog.Find("Happy")));
+        // Hinduism has no content yet.
+        Assert.Null(FaithLibrary.PickForEmotion(FaithTradition.Hinduism, null));
+        Assert.Null(FaithLibrary.PickForEmotion(FaithTradition.Hinduism, EmotionCatalog.Find("Happy")));
+    }
+
+    [Fact]
+    public void PickForEmotion_Islam_ReturnsAnIslamicPassage()
+    {
+        // "Anxious" is under the Fearful core → the Islamic fear pool.
+        var anxious = EmotionCatalog.Find("Anxious");
+        for (var i = 0; i < Iterations; i++)
+        {
+            var p = FaithLibrary.PickForEmotion(FaithTradition.Islam, anxious);
+            Assert.NotNull(p);
+            Assert.Equal(FaithTradition.Islam, p!.Tradition);
+            Assert.StartsWith("islam-", p.Id);
+        }
+    }
+
+    [Fact]
+    public void PickForEmotion_Judaism_NullEmotion_ReturnsGeneralPassage()
+    {
+        for (var i = 0; i < Iterations; i++)
+        {
+            var p = FaithLibrary.PickForEmotion(FaithTradition.Judaism, null);
+            Assert.NotNull(p);
+            Assert.Equal(FaithTradition.Judaism, p!.Tradition);
+            Assert.StartsWith("jud-gen-", p.Id);
+        }
     }
 
     // ---- Daily ----
@@ -118,10 +145,25 @@ public class FaithLibraryTests
     [Fact]
     public void Daily_SkipsUnstockedSelections()
     {
-        // Islam has no content yet; with both selected it must still return the
+        // Hinduism has no content yet; with both selected it must still return the
         // stocked (Christian) passage rather than null.
-        var p = FaithLibrary.Daily(new[] { FaithTradition.Islam, FaithTradition.Christianity }, new DateOnly(2026, 7, 3));
+        var p = FaithLibrary.Daily(new[] { FaithTradition.Hinduism, FaithTradition.Christianity }, new DateOnly(2026, 7, 3));
         Assert.NotNull(p);
         Assert.Equal(FaithTradition.Christianity, p!.Tradition);
+    }
+
+    [Fact]
+    public void Daily_RotatesAcrossSelectedTraditionsByDay()
+    {
+        var selected = new[] { FaithTradition.Christianity, FaithTradition.Islam };
+        var d1 = new DateOnly(2026, 7, 3);
+
+        var p1 = FaithLibrary.Daily(selected, d1);
+        var p2 = FaithLibrary.Daily(selected, d1.AddDays(1));
+
+        Assert.NotNull(p1);
+        Assert.NotNull(p2);
+        // Two stocked traditions → consecutive days alternate which one is shown.
+        Assert.NotEqual(p1!.Tradition, p2!.Tradition);
     }
 }
