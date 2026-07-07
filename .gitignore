@@ -488,3 +488,7 @@ src/DoWellToDoGood/wwwroot/css/app.css
 
 # Claude Code local dev config (preview launch command)
 .claude/launch.json
+
+# Local dev test-account credentials — NEVER commit real values (see
+# dev-credentials.example.json and docs/testing-authenticated-pages.md)
+dev-credentials.local.json
