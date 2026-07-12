@@ -1,0 +1,359 @@
+@page "/sleep"
+@using System.Globalization
+@using DoWellToDoGood.Models
+@using DoWellToDoGood.Services
+@inject AuthService Auth
+@inject CryptoService Crypto
+@inject SleepService Svc
+@inject IJSRuntime JS
+
+<PageTitle>Sleep — Do Well to Do Good</PageTitle>
+
+<div class="mx-auto max-w-3xl px-6 space-y-6">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="space-y-1 min-w-0">
+            <h1 class="m-0">Sleep journal</h1>
+            <p class="text-muted m-0">
+                Log last night in the morning. Everything — your times, what kept you up, your naps —
+                is encrypted, so only you can ever read it.
+            </p>
+        </div>
+        @if (Auth.IsSignedIn)
+        {
+            <a class="btn" href="sleep/review">Review →</a>
+        }
+    </div>
+
+    @if (!Auth.IsSignedIn)
+    {
+        <div class="card text-center space-y-4">
+            <p class="text-muted m-0">Sign in to keep a sleep journal — encrypted so only you can read it.</p>
+            <a class="btn btn-primary" href="signin">Sign in</a>
+        </div>
+    }
+    else if (!Crypto.IsUnlocked)
+    {
+        <VaultGate OnUnlocked="Load" />
+    }
+    else
+    {
+        @* ---------- Log / edit a night ---------- *@
+        <section class="card space-y-5" aria-labelledby="log-h">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h2 id="log-h" class="m-0 text-base font-bold">@(_existingId is null ? "Log a night" : "Edit this night")</h2>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <label class="text-sm text-muted" for="night">Morning of</label>
+                    <input id="night" class="input !min-h-0 py-1 w-auto" type="date" max="@_todayStr"
+                           value="@_nightStr" @onchange="OnNightChanged" />
+                </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="field m-0">
+                    <label class="label" for="bedtime">When did you go to sleep?</label>
+                    <input id="bedtime" class="input" type="time" @bind="_bedtime" />
+                </div>
+                <div class="field m-0">
+                    <label class="label" for="waketime">When did you get up?</label>
+                    <input id="waketime" class="input" type="time" @bind="_wakeTime" />
+                </div>
+            </div>
+
+            @if (LiveInBed is { } tib)
+            {
+                <p class="m-0 text-sm text-muted">
+                    Time in bed: <span class="font-semibold text-ink">@SleepMath.FormatDuration(tib)</span>
+                    @if (LiveSleep is { } sl && sl != tib)
+                    {
+                        <span> · estimated sleep <span class="font-semibold text-ink">@SleepMath.FormatDuration(sl)</span></span>
+                    }
+                </p>
+            }
+
+            @* Night wake-ups *@
+            <div class="space-y-2">
+                <span class="label">Did you wake in the night? For how long?</span>
+                @if (_wakeups.Count == 0)
+                {
+                    <p class="text-sm text-muted m-0">No night wake-ups logged.</p>
+                }
+                @foreach (var w in _wakeups)
+                {
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <input class="input !min-h-0 py-1 w-24" type="number" min="1" max="1440" step="5"
+                               @bind="w.Minutes" aria-label="Minutes awake" />
+                        <span class="text-sm text-muted">minutes awake</span>
+                        <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => _wakeups.Remove(w)">Remove</button>
+                    </div>
+                }
+                <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="AddWakeup">+ Add a wake-up</button>
+            </div>
+
+            @* What was on your mind *@
+            <div class="field m-0">
+                <label class="label" for="thoughts">What was on your mind while awake, or trying to sleep?</label>
+                <textarea id="thoughts" class="textarea" rows="4" maxlength="8000"
+                          placeholder="Anything that was turning over in your head…" @bind="_thoughts"></textarea>
+            </div>
+
+            @* Daytime naps *@
+            <div class="space-y-2">
+                <span class="label">Any naps during the day?</span>
+                @if (_naps.Count == 0)
+                {
+                    <p class="text-sm text-muted m-0">No naps logged.</p>
+                }
+                @foreach (var n in _naps)
+                {
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <input class="input !min-h-0 py-1 w-24" type="number" min="1" max="1440" step="5"
+                               @bind="n.Minutes" aria-label="Nap minutes" />
+                        <span class="text-sm text-muted">minute nap</span>
+                        <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => _naps.Remove(n)">Remove</button>
+                    </div>
+                }
+                <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="AddNap">+ Add a nap</button>
+            </div>
+
+            @if (_saveError is not null)
+            {
+                <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_saveError</p>
+            }
+            <div class="flex items-center gap-3 flex-wrap">
+                <button class="btn btn-primary" disabled="@(!HasContent || _saving)" @onclick="Save">
+                    @(_saving ? "Encrypting & saving…" : _existingId is null ? "Save this night" : "Update this night")
+                </button>
+                @if (_existingId is not null)
+                {
+                    <button class="btn btn-ghost" disabled="@_saving" @onclick="ClearForm">Log a different night</button>
+                }
+                @if (_savedFlash)
+                {
+                    <span class="badge" role="status">Saved ✓</span>
+                }
+            </div>
+        </section>
+
+        @* ---------- Recent nights ---------- *@
+        @if (_loading)
+        {
+            <p class="text-muted" role="status">Decrypting your sleep journal…</p>
+        }
+        else if (_recent.Count > 0)
+        {
+            <section class="space-y-3" aria-labelledby="recent-h">
+                <h2 id="recent-h" class="text-base font-bold m-0">Recent nights</h2>
+                @foreach (var r in _recent)
+                {
+                    <article class="rounded-bubble-lg border border-line shadow-soft-sm p-4"
+                             style="border-left:6px solid var(--color-secondary); background:linear-gradient(180deg, var(--color-secondary-soft), var(--color-surface) 78%)">
+                        <header class="flex justify-between items-baseline gap-3 flex-wrap">
+                            <span class="font-bold">@r.Night.ToString("dddd, MMM d", CultureInfo.CurrentCulture)</span>
+                            <span class="text-sm text-muted">
+                                @if (SleepMath.EstimatedSleepMinutes(r) is { } s)
+                                {
+                                    <span class="stat-num !text-lg">@SleepMath.FormatDuration(s)</span> <span>sleep</span>
+                                }
+                                else
+                                {
+                                    <span>no times logged</span>
+                                }
+                            </span>
+                        </header>
+                        <p class="m-0 mt-1 text-sm text-muted flex gap-x-4 gap-y-1 flex-wrap">
+                            @if (r.Bedtime is { } b && r.WakeTime is { } w)
+                            {
+                                <span>@b.ToString("h:mm tt", CultureInfo.CurrentCulture) → @w.ToString("h:mm tt", CultureInfo.CurrentCulture)</span>
+                            }
+                            @if (r.Wakeups.Count > 0)
+                            {
+                                <span>@r.Wakeups.Count wake-up@(r.Wakeups.Count == 1 ? "" : "s") · @SleepMath.FormatDuration(SleepMath.TotalWakeMinutes(r)) awake</span>
+                            }
+                            @if (r.Naps.Count > 0)
+                            {
+                                <span>@r.Naps.Count nap@(r.Naps.Count == 1 ? "" : "s") · @SleepMath.FormatDuration(SleepMath.TotalNapMinutes(r))</span>
+                            }
+                        </p>
+                        @if (!string.IsNullOrWhiteSpace(r.Thoughts))
+                        {
+                            <p class="m-0 mt-2 whitespace-pre-wrap">@r.Thoughts</p>
+                        }
+                        <footer class="mt-3 flex gap-2 justify-end">
+                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => EditNight(r)">Edit</button>
+                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteNight(r.Night)">Delete</button>
+                        </footer>
+                    </article>
+                }
+                <p class="text-sm"><a class="font-semibold" href="sleep/review">See your week &amp; month at a glance →</a></p>
+            </section>
+        }
+    }
+</div>
+
+@code {
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
+    private readonly string _todayStr = Today.ToString("yyyy-MM-dd");
+
+    private bool _loading = true;
+
+    // Form state
+    private DateOnly _night = Today;
+    private string _nightStr = Today.ToString("yyyy-MM-dd");
+    private Guid? _existingId; // set when the chosen night already has a saved row
+    private string? _bedtime;
+    private string? _wakeTime;
+    private readonly List<Duration> _wakeups = new();
+    private readonly List<Duration> _naps = new();
+    private string _thoughts = "";
+    private bool _saving;
+    private bool _savedFlash;
+    private string? _saveError;
+
+    // Recent nights (decrypted)
+    private readonly Dictionary<DateOnly, Guid> _idByNight = new();
+    private List<SleepNight> _recent = new();
+
+    private sealed class Duration { public int Minutes { get; set; } = 15; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsSignedIn && Crypto.IsUnlocked) await Load();
+        else _loading = false;
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            _idByNight.Clear();
+            var rows = await Svc.ListRangeAsync(Today.AddDays(-13), Today);
+            var nights = new List<SleepNight>();
+            foreach (var row in rows)
+            {
+                _idByNight[row.NightDate] = row.Id;
+                string json;
+                try { json = await Crypto.DecryptAsync(row.Payload); }
+                catch { continue; } // skip rows that won't decrypt with this key
+                nights.Add(SleepPayload.Parse(json, row.NightDate));
+            }
+            _recent = nights;
+            await LoadNightIntoForm(_night);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private TimeOnly? ParsedBedtime => TimeOnly.TryParseExact(_bedtime, "HH:mm", out var t) ? t : null;
+    private TimeOnly? ParsedWakeTime => TimeOnly.TryParseExact(_wakeTime, "HH:mm", out var t) ? t : null;
+
+    private SleepNight CurrentDraft => new(
+        _night, ParsedBedtime, ParsedWakeTime,
+        _wakeups.Select(w => w.Minutes).Where(m => m > 0).ToList(),
+        _naps.Select(n => n.Minutes).Where(m => m > 0).ToList(),
+        _thoughts.Trim());
+
+    private int? LiveInBed => SleepMath.TimeInBedMinutes(CurrentDraft);
+    private int? LiveSleep => SleepMath.EstimatedSleepMinutes(CurrentDraft);
+
+    private bool HasContent =>
+        ParsedBedtime is not null || ParsedWakeTime is not null
+        || _wakeups.Any(w => w.Minutes > 0) || _naps.Any(n => n.Minutes > 0)
+        || !string.IsNullOrWhiteSpace(_thoughts);
+
+    private async Task OnNightChanged(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var d))
+        {
+            if (d > Today) d = Today;
+            await LoadNightIntoForm(d);
+        }
+    }
+
+    private Task LoadNightIntoForm(DateOnly night)
+    {
+        _night = night;
+        _nightStr = night.ToString("yyyy-MM-dd");
+        _saveError = null;
+        _savedFlash = false;
+
+        var existing = _recent.FirstOrDefault(n => n.Night == night);
+        if (existing is not null)
+        {
+            _existingId = _idByNight.TryGetValue(night, out var id) ? id : null;
+            _bedtime = existing.Bedtime?.ToString("HH:mm");
+            _wakeTime = existing.WakeTime?.ToString("HH:mm");
+            _thoughts = existing.Thoughts;
+            _wakeups.Clear();
+            _wakeups.AddRange(existing.Wakeups.Select(m => new Duration { Minutes = m }));
+            _naps.Clear();
+            _naps.AddRange(existing.Naps.Select(m => new Duration { Minutes = m }));
+        }
+        else
+        {
+            ResetFields();
+        }
+        return Task.CompletedTask;
+    }
+
+    private void ResetFields()
+    {
+        _existingId = null;
+        _bedtime = null;
+        _wakeTime = null;
+        _thoughts = "";
+        _wakeups.Clear();
+        _naps.Clear();
+    }
+
+    private void ClearForm()
+    {
+        ResetFields();
+        _savedFlash = false;
+        _saveError = null;
+    }
+
+    private void AddWakeup() => _wakeups.Add(new Duration());
+    private void AddNap() => _naps.Add(new Duration());
+
+    private async Task Save()
+    {
+        if (!HasContent || _saving) return;
+        _saveError = null;
+        _saving = true;
+        try
+        {
+            var blob = await Crypto.EncryptAsync(SleepPayload.Serialize(CurrentDraft));
+            await Svc.SaveNightAsync(_night, blob);
+            await Load();       // refresh recent list + re-attach this night's id
+            _savedFlash = true;
+        }
+        catch
+        {
+            _saveError = "Couldn't save. Check your connection and try again — your entry is still here.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task EditNight(SleepNight n)
+    {
+        await LoadNightIntoForm(n.Night);
+        await JS.InvokeVoidAsync("scrollTo", 0, 0);
+    }
+
+    private async Task DeleteNight(DateOnly night)
+    {
+        if (!_idByNight.TryGetValue(night, out var id)) return;
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this night's sleep log? This can't be undone."))
+            return;
+        await Svc.DeleteNightAsync(id);
+        if (_night == night) ClearForm();
+        await Load();
+    }
+}
