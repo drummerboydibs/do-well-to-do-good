@@ -51,11 +51,11 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="field m-0">
                     <label class="label" for="bedtime">When did you go to sleep?</label>
-                    <input id="bedtime" class="input" type="time" @bind="_bedtime" />
+                    <input id="bedtime" class="input" type="time" value="@_bedtime" @onchange="e => _bedtime = e.Value?.ToString()" />
                 </div>
                 <div class="field m-0">
                     <label class="label" for="waketime">When did you get up?</label>
-                    <input id="waketime" class="input" type="time" @bind="_wakeTime" />
+                    <input id="waketime" class="input" type="time" value="@_wakeTime" @onchange="e => _wakeTime = e.Value?.ToString()" />
                 </div>
             </div>
 
