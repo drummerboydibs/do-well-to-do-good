@@ -39,6 +39,16 @@ jobs:
       - name: Set base href for project Pages
         run: sed -i 's|<base href="/" />|<base href="/do-well-to-do-good/" />|' release/wwwroot/index.html
 
+      # Cache-bust the stylesheet: app.css ships under a stable name, so browsers
+      # and the Pages CDN keep serving the old copy after a deploy. Stamp a
+      # content hash onto the link so each change is a fresh URL. Runs before the
+      # 404 copy below so the fallback page gets the same busted link.
+      - name: Cache-bust app.css
+        run: |
+          hash=$(md5sum release/wwwroot/css/app.css | cut -c1-10)
+          sed -i "s|css/app.css|css/app.css?v=$hash|g" release/wwwroot/index.html
+          echo "Stamped app.css?v=$hash"
+
       # Client-side routing fallback: serve the app for unknown paths / deep links
       - name: Add SPA 404 fallback
         run: cp release/wwwroot/index.html release/wwwroot/404.html
