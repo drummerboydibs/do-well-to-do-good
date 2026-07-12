@@ -11,14 +11,14 @@
 @* Open-goal card template (declared before use). *@
 @{
     RenderFragment<GoalVm> GoalCard = g =>
-    @<article class="card space-y-3">
+    @<article class="card space-y-4">
         @if (g.Editing)
         {
             <div class="field m-0">
                 <label class="label" for="edit-title-@g.Id">Goal</label>
                 <input id="edit-title-@g.Id" class="input" type="text" maxlength="200" @bind="g.EditTitle" />
             </div>
-            <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex items-center gap-3 flex-wrap">
                 <label class="text-sm text-muted" for="edit-end-@g.Id">Target date</label>
                 <input id="edit-end-@g.Id" class="input !min-h-0 py-1 w-auto" type="date" @bind="g.EditEnd" />
                 @if (g.EditEnd is not null)
@@ -71,11 +71,11 @@
                 </ul>
             }
 
-            <div class="card-soft space-y-2">
+            <div class="card-soft space-y-3">
                 <label class="label text-sm m-0" for="prog-@g.Id">Log progress</label>
                 <textarea id="prog-@g.Id" class="textarea !min-h-[4rem]" rows="2" maxlength="5000"
                           placeholder="What happened? e.g. Introduced myself to a stranger named Sarah." @bind="g.DraftNote"></textarea>
-                <div class="flex items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-3 flex-wrap">
                     <input class="input !min-h-0 py-1 w-auto" type="date" max="@_today" @bind="g.DraftDate" />
                     <button class="btn btn-primary !min-h-0 py-2" disabled="@string.IsNullOrWhiteSpace(g.DraftNote)" @onclick="() => AddProgress(g)">Add</button>
                 </div>
@@ -126,13 +126,13 @@
                 @for (int i = 0; i < _goalDrafts.Count; i++)
                 {
                     var d = _goalDrafts[i];
-                    <div class="card-soft space-y-2">
+                    <div class="card-soft space-y-3">
                         <div class="flex justify-between items-center gap-2">
                             <span class="font-semibold text-sm">Goal @(i + 1)</span>
                             <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => RemoveGoalDraft(d)">Remove</button>
                         </div>
                         <input class="input" type="text" maxlength="200" placeholder="e.g. Introduce yourself to two strangers" @bind="d.Title" />
-                        <div class="flex items-center gap-2 flex-wrap">
+                        <div class="flex items-center gap-3 flex-wrap">
                             <label class="text-sm text-muted" for="g-end-@i">Target date (optional)</label>
                             <input id="g-end-@i" class="input !min-h-0 py-1 w-auto" type="date" min="@_today" @bind="d.End" />
                             @if (d.End is not null)
