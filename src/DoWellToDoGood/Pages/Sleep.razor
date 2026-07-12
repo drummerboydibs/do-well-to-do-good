@@ -14,8 +14,8 @@
         <div class="space-y-1 min-w-0">
             <h1 class="m-0">Sleep journal</h1>
             <p class="text-muted m-0">
-                Log last night in the morning. Everything — your times, what kept you up, your naps —
-                is encrypted, so only you can ever read it.
+                Log this morning — or pick any past date to fill in or edit. Everything — your times,
+                what kept you up, your naps — is encrypted, so only you can ever read it.
             </p>
         </div>
         @if (Auth.IsSignedIn)
@@ -273,30 +273,41 @@
         }
     }
 
-    private Task LoadNightIntoForm(DateOnly night)
+    // Pull the chosen night straight from the server so ANY past date can be
+    // opened for editing — not just the recent window shown below.
+    private async Task LoadNightIntoForm(DateOnly night)
     {
         _night = night;
         _nightStr = night.ToString("yyyy-MM-dd");
         _saveError = null;
         _savedFlash = false;
 
-        var existing = _recent.FirstOrDefault(n => n.Night == night);
-        if (existing is not null)
-        {
-            _existingId = _idByNight.TryGetValue(night, out var id) ? id : null;
-            _bedtime = existing.Bedtime?.ToString("HH:mm");
-            _wakeTime = existing.WakeTime?.ToString("HH:mm");
-            _thoughts = existing.Thoughts;
-            _wakeups.Clear();
-            _wakeups.AddRange(existing.Wakeups.Select(m => new Duration { Minutes = m }));
-            _naps.Clear();
-            _naps.AddRange(existing.Naps.Select(m => new Duration { Minutes = m }));
-        }
-        else
+        SleepService.NightRow? row = null;
+        try { row = await Svc.GetByNightAsync(night); }
+        catch { /* offline / transient — fall back to a blank form */ }
+
+        if (row is null)
         {
             ResetFields();
+            return;
         }
-        return Task.CompletedTask;
+
+        try
+        {
+            var parsed = SleepPayload.Parse(await Crypto.DecryptAsync(row.Payload), night);
+            _existingId = row.Id;
+            _bedtime = parsed.Bedtime?.ToString("HH:mm");
+            _wakeTime = parsed.WakeTime?.ToString("HH:mm");
+            _thoughts = parsed.Thoughts;
+            _wakeups.Clear();
+            _wakeups.AddRange(parsed.Wakeups.Select(m => new Duration { Minutes = m }));
+            _naps.Clear();
+            _naps.AddRange(parsed.Naps.Select(m => new Duration { Minutes = m }));
+        }
+        catch
+        {
+            ResetFields(); // couldn't decrypt with this key — start clean rather than corrupt
+        }
     }
 
     private void ResetFields()
