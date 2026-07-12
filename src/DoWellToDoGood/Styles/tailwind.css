@@ -170,6 +170,11 @@ html[data-theme="dark"] #blazor-error-ui {
     html { color-scheme: light; }
     html, body { height: 100%; }
 
+    /* Never let a page scroll sideways: a single stray wide element (e.g. a
+       native date/time control) should clip, not shove the whole layout off
+       the edge. Pairs with min-width:0 on form controls below. */
+    html, body { overflow-x: clip; max-width: 100%; }
+
     body {
         background-color: var(--color-bg);
         background-image:
@@ -238,6 +243,11 @@ html[data-theme="dark"] #blazor-error-ui {
 
     .input, .textarea, .select {
         @apply w-full rounded-bubble px-4 py-3 min-h-[2.9rem];
+        /* min-width:0 lets native date/time controls (which claim a large
+           intrinsic min-width on iOS) shrink to the field instead of
+           overflowing the card; max-width caps any w-auto variants. */
+        min-width: 0;
+        max-width: 100%;
         font: inherit;
         color: var(--color-ink);
         background: var(--color-surface);
