@@ -41,7 +41,7 @@
         <section class="card space-y-5" aria-labelledby="log-h">
             <div class="flex items-center justify-between gap-3 flex-wrap">
                 <h2 id="log-h" class="m-0 text-base font-bold">@(_existingId is null ? "Log a night" : "Edit this night")</h2>
-                <div class="flex items-center gap-2 flex-wrap">
+                <div class="flex items-center gap-3 flex-wrap">
                     <label class="text-sm text-muted" for="night">Morning of</label>
                     <input id="night" class="input !min-h-0 py-1 w-auto" type="date" max="@_todayStr"
                            value="@_nightStr" @onchange="OnNightChanged" />
@@ -71,7 +71,7 @@
             }
 
             @* Night wake-ups *@
-            <div class="space-y-2">
+            <div class="space-y-3">
                 <span class="label">Did you wake in the night? For how long?</span>
                 @if (_wakeups.Count == 0)
                 {
@@ -79,7 +79,7 @@
                 }
                 @foreach (var w in _wakeups)
                 {
-                    <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex items-center gap-3 flex-wrap">
                         <input class="input !min-h-0 py-1 w-24" type="number" min="1" max="1440" step="5"
                                @bind="w.Minutes" aria-label="Minutes awake" />
                         <span class="text-sm text-muted">minutes awake</span>
@@ -97,7 +97,7 @@
             </div>
 
             @* Daytime naps *@
-            <div class="space-y-2">
+            <div class="space-y-3">
                 <span class="label">Any naps during the day?</span>
                 @if (_naps.Count == 0)
                 {
@@ -105,7 +105,7 @@
                 }
                 @foreach (var n in _naps)
                 {
-                    <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex items-center gap-3 flex-wrap">
                         <input class="input !min-h-0 py-1 w-24" type="number" min="1" max="1440" step="5"
                                @bind="n.Minutes" aria-label="Nap minutes" />
                         <span class="text-sm text-muted">minute nap</span>

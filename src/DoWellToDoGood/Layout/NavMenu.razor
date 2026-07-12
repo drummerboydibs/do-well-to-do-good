@@ -2,7 +2,7 @@
 @implements IDisposable
 @inject AuthService Auth
 
-<nav class="flex gap-1 items-center flex-wrap justify-center" aria-label="Primary">
+<nav class="flex gap-x-3 gap-y-2 items-center flex-wrap justify-center" aria-label="Primary">
     <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink>
     <NavLink class="nav-link" href="journal">Write</NavLink>
     @if (Auth.IsSignedIn)

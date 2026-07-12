@@ -261,6 +261,27 @@ html[data-theme="dark"] #blazor-error-ui {
         box-shadow: 0 0 0 3px var(--color-primary-soft);
     }
     .valid.modified:not([type=checkbox]) { border-color: var(--color-success); }
+
+    /* Native date/time controls on iOS Safari claim an oversized intrinsic
+       width and won't shrink, which pushed cards off-screen. Stripping the
+       native appearance makes them size like an ordinary text field (respect
+       width:100% / the field's box) while still opening the picker on tap. */
+    input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"] {
+        -webkit-appearance: none;
+        appearance: none;
+    }
+    input[type="date"]::-webkit-date-and-time-value,
+    input[type="time"]::-webkit-date-and-time-value,
+    input[type="datetime-local"]::-webkit-date-and-time-value {
+        text-align: left;
+        margin: 0;
+    }
+    /* Keep the tappable picker indicator visible and comfortably sized. */
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator {
+        opacity: 0.6;
+        cursor: pointer;
+    }
     .invalid { border-color: var(--color-danger); }
     .validation-message { color: var(--color-danger); font-size: 0.9rem; }
 
