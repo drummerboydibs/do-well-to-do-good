@@ -1,0 +1,231 @@
+@page "/sleep/review"
+@using System.Globalization
+@using DoWellToDoGood.Models
+@using DoWellToDoGood.Services
+@inject AuthService Auth
+@inject CryptoService Crypto
+@inject SleepService Svc
+
+<PageTitle>Sleep review — Do Well to Do Good</PageTitle>
+
+<div class="mx-auto max-w-3xl px-6 space-y-6">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="space-y-1 min-w-0">
+            <h1 class="m-0">Sleep at a glance</h1>
+            <p class="text-muted m-0">Your own patterns, worked out in your browser — nothing here ever leaves it unencrypted.</p>
+        </div>
+        <a class="btn" href="sleep">← Log</a>
+    </div>
+
+    @if (!Auth.IsSignedIn)
+    {
+        <div class="card text-center space-y-4">
+            <p class="text-muted m-0">Sign in to see your sleep review — built from entries only you can decrypt.</p>
+            <a class="btn btn-primary" href="signin">Sign in</a>
+        </div>
+    }
+    else if (!Crypto.IsUnlocked)
+    {
+        <VaultGate OnUnlocked="ReloadAll" />
+    }
+    else if (_loading)
+    {
+        <p class="text-muted" role="status">Decrypting and adding up your nights…</p>
+    }
+    else
+    {
+        @* ================= Week at a glance ================= *@
+        <section class="card space-y-4" aria-labelledby="week-h">
+            <div class="flex items-center justify-between gap-2">
+                <button class="btn btn-ghost !min-h-0 !py-1 !px-2" @onclick="() => ShiftWeek(-1)" aria-label="Previous week">←</button>
+                <h2 id="week-h" class="m-0 text-base font-bold text-center">@WeekLabel</h2>
+                <button class="btn btn-ghost !min-h-0 !py-1 !px-2" disabled="@_weekAtToday" @onclick="() => ShiftWeek(1)" aria-label="Next week">→</button>
+            </div>
+
+            <div class="flex items-end justify-between gap-1.5" style="height:160px" role="img" aria-label="@WeekAria">
+                @foreach (var day in SleepMath.WeekDays(_weekAnchor))
+                {
+                    var night = Get(day);
+                    var mins = night is null ? (int?)null : SleepMath.EstimatedSleepMinutes(night);
+                    <div class="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+                        <span class="text-[10px] text-muted leading-none">@(mins is { } m ? SleepMath.FormatDuration(m) : "")</span>
+                        <div class="w-full rounded-t" style="height:@BarPct(mins)%; min-height:@(mins is > 0 ? "3px" : "0"); background:@(day == Today ? "var(--color-primary)" : "var(--color-secondary)")"
+                             title="@day.ToString("ddd, MMM d", CultureInfo.CurrentCulture): @(mins is { } mm ? SleepMath.FormatDuration(mm) : "no entry")"></div>
+                        <span class="text-[11px] font-semibold @(day == Today ? "text-ink" : "text-muted")">@(day.ToString("ddd", CultureInfo.CurrentCulture)[..1])</span>
+                    </div>
+                }
+            </div>
+            <p class="text-xs text-muted m-0 text-center">Bars show estimated sleep (time in bed minus night wake-ups). Scale tops out at 12h.</p>
+
+            @{ var wk = SleepMath.Summarize(SleepMath.WeekDays(_weekAnchor).Select(Get).Where(n => n is not null)!); }
+            <div class="flex gap-x-6 gap-y-2 flex-wrap justify-center pt-1">
+                @StatBlock(wk.NightsLogged.ToString(), "nights logged")
+                @StatBlock(AvgLabel(wk.AvgSleepMinutes), "avg sleep")
+                @StatBlock(wk.AvgWakeupsPerNight.ToString("0.#"), "avg wake-ups")
+                @StatBlock(wk.NapCount.ToString(), "naps")
+            </div>
+        </section>
+
+        @* ================= Month at a glance ================= *@
+        <section class="card space-y-4" aria-labelledby="month-h">
+            <div class="flex items-center justify-between gap-2">
+                <button class="btn btn-ghost !min-h-0 !py-1 !px-2" @onclick="() => ShiftMonth(-1)" aria-label="Previous month">←</button>
+                <h2 id="month-h" class="m-0 text-base font-bold text-center">@_monthAnchor.ToString("MMMM yyyy", CultureInfo.CurrentCulture)</h2>
+                <button class="btn btn-ghost !min-h-0 !py-1 !px-2" disabled="@_monthAtToday" @onclick="() => ShiftMonth(1)" aria-label="Next month">→</button>
+            </div>
+
+            <div class="grid grid-cols-7 gap-1.5 text-center">
+                @foreach (var d in new[] { "M", "T", "W", "T", "F", "S", "S" })
+                {
+                    <span class="text-[11px] font-semibold text-muted">@d</span>
+                }
+                @foreach (var _ in Enumerable.Range(0, LeadingBlanks))
+                {
+                    <span></span>
+                }
+                @foreach (var day in MonthDays)
+                {
+                    var night = Get(day);
+                    var mins = night is null ? (int?)null : SleepMath.EstimatedSleepMinutes(night);
+                    <div class="aspect-square rounded-md flex items-center justify-center text-[11px] border"
+                         style="background:@HeatColor(mins); border-color:@(day == Today ? "var(--color-primary)" : "var(--color-line)"); color:var(--color-ink)"
+                         title="@day.ToString("MMM d", CultureInfo.CurrentCulture): @(mins is { } m ? SleepMath.FormatDuration(m) : "no entry")">
+                        @day.Day
+                    </div>
+                }
+            </div>
+
+            <div class="flex items-center justify-center gap-2 text-xs text-muted">
+                <span>less</span>
+                <span class="inline-block w-4 h-4 rounded" style="background:@HeatFor(0.0)"></span>
+                <span class="inline-block w-4 h-4 rounded" style="background:@HeatFor(0.33)"></span>
+                <span class="inline-block w-4 h-4 rounded" style="background:@HeatFor(0.66)"></span>
+                <span class="inline-block w-4 h-4 rounded" style="background:@HeatFor(1.0)"></span>
+                <span>more sleep</span>
+            </div>
+
+            @{ var mo = SleepMath.Summarize(MonthDays.Select(Get).Where(n => n is not null)!); }
+            <div class="flex gap-x-6 gap-y-2 flex-wrap justify-center pt-1">
+                @StatBlock(mo.NightsLogged.ToString(), "nights logged")
+                @StatBlock(AvgLabel(mo.AvgSleepMinutes), "avg sleep")
+                @StatBlock(mo.AvgWakeupsPerNight.ToString("0.#"), "avg wake-ups")
+                @StatBlock(SleepMath.FormatDuration(mo.TotalNapMinutes), "nap time")
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    // A tiny inline stat presenter to keep the markup tidy.
+    private RenderFragment StatBlock(string value, string label) =>@<div class="text-center">
+        <div class="stat-num">@value</div>
+        <div class="text-xs text-muted">@label</div>
+    </div>;
+
+    private const int ScaleMinutes = 720; // 12h ceiling for the week bars
+
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
+    private bool _loading = true;
+
+    private DateOnly _weekAnchor = Today;
+    private DateOnly _monthAnchor = new(Today.Year, Today.Month, 1);
+
+    private readonly Dictionary<DateOnly, SleepNight> _byNight = new();
+
+    private SleepNight? Get(DateOnly d) => _byNight.TryGetValue(d, out var n) ? n : null;
+
+    private bool _weekAtToday => _weekAnchor >= SleepMath.WeekDays(Today)[0];
+    private bool _monthAtToday => _monthAnchor >= new DateOnly(Today.Year, Today.Month, 1);
+
+    private string WeekLabel
+    {
+        get
+        {
+            var days = SleepMath.WeekDays(_weekAnchor);
+            return $"{days[0].ToString("MMM d", CultureInfo.CurrentCulture)} – {days[6].ToString("MMM d", CultureInfo.CurrentCulture)}";
+        }
+    }
+
+    private string WeekAria => $"Estimated sleep for the week of {WeekLabel}";
+
+    private IReadOnlyList<DateOnly> MonthDays
+    {
+        get
+        {
+            var days = DateTime.DaysInMonth(_monthAnchor.Year, _monthAnchor.Month);
+            return Enumerable.Range(0, days).Select(i => _monthAnchor.AddDays(i)).ToList();
+        }
+    }
+
+    // Monday-first offset of the 1st of the month.
+    private int LeadingBlanks => ((int)_monthAnchor.DayOfWeek + 6) % 7;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsSignedIn && Crypto.IsUnlocked) await ReloadAll();
+        else _loading = false;
+    }
+
+    private async Task ReloadAll()
+    {
+        _loading = true;
+        StateHasChanged();
+        try
+        {
+            await EnsureLoaded(SleepMath.WeekDays(_weekAnchor)[0], SleepMath.WeekDays(_weekAnchor)[6]);
+            await EnsureLoaded(_monthAnchor, _monthAnchor.AddDays(DateTime.DaysInMonth(_monthAnchor.Year, _monthAnchor.Month) - 1));
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // Fetch a date range and merge decrypted nights into the cache.
+    private async Task EnsureLoaded(DateOnly from, DateOnly to)
+    {
+        var rows = await Svc.ListRangeAsync(from, to);
+        foreach (var row in rows)
+        {
+            try
+            {
+                var json = await Crypto.DecryptAsync(row.Payload);
+                _byNight[row.NightDate] = SleepPayload.Parse(json, row.NightDate);
+            }
+            catch { /* skip rows that won't decrypt with this key */ }
+        }
+    }
+
+    private async Task ShiftWeek(int delta)
+    {
+        _weekAnchor = _weekAnchor.AddDays(7 * delta);
+        var days = SleepMath.WeekDays(_weekAnchor);
+        await EnsureLoaded(days[0], days[6]);
+    }
+
+    private async Task ShiftMonth(int delta)
+    {
+        _monthAnchor = _monthAnchor.AddMonths(delta);
+        await EnsureLoaded(_monthAnchor, _monthAnchor.AddDays(DateTime.DaysInMonth(_monthAnchor.Year, _monthAnchor.Month) - 1));
+    }
+
+    private static int BarPct(int? minutes) =>
+        minutes is { } m ? (int)Math.Round(Math.Clamp((double)m / ScaleMinutes, 0, 1) * 100) : 0;
+
+    private static string AvgLabel(double? minutes) =>
+        minutes is { } m ? SleepMath.FormatDuration((int)Math.Round(m)) : "—";
+
+    // Heatmap: null → faint sunken; logged → secondary tint scaled by sleep amount.
+    private static string HeatColor(int? minutes)
+    {
+        if (minutes is not { } m) return "var(--color-sunken)";
+        var t = Math.Clamp((double)m / 600, 0, 1); // 10h saturates the scale
+        return HeatFor(t);
+    }
+
+    private static string HeatFor(double t)
+    {
+        var pct = (int)Math.Round(12 + t * 68); // 12%–80% mix of secondary into the surface
+        return $"color-mix(in srgb, var(--color-secondary) {pct}%, var(--color-surface))";
+    }
+}
