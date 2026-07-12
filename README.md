@@ -18,6 +18,7 @@ Journal your thoughts, feelings, and mood — then save them privately (encrypte
 - **Cited tips** — wellness tips matched to your emotion, paraphrased in plain language and **credited with a link** to the original source (NHS, NIH — NIMH & NIA, APA, Mayo Clinic, and UC Berkeley's Greater Good). Not feeling it? A **"show me another"** shuffle offers a fresh one without repeating recent tips.
 - **Therapy & goals** — signed-in users can log therapy sessions, set up to four goals (each with an optional target date), record progress over time, and get open-goal reminders on the home and writing pages — all encrypted, just like journal entries.
 - **Recovery counters** — track days free from anything you're leaving behind (alcohol, nicotine, gambling, …), with AA-style **milestone** celebrations and a personal best. A setback resets *without guilt*: your longest and most-recent runs are kept, and you get a non-judgmental, research-backed message plus a link to support. Fully encrypted — even the date is invisible to the server.
+- **Sleep journal** — log a night the next morning (bedtime, wake time, any night wake-ups and how long, what kept you up, daytime naps), with a live time-in-bed / estimated-sleep readout. A **review** shows your patterns as a **week-at-a-glance** bar chart and a **month** calendar heatmap, all worked out in the browser. Encrypted like everything else — only the night's date is stored in the clear.
 - **Faith & belief (optional)** — opt into one or more traditions on your Account page to weave gently-worded, **cited** passages into your tips and a passage-of-the-day on Home and Write. Stocked with **Christianity** (KJV), **Islam** (Pickthall), **Judaism** (JPS 1917), and **Hinduism** (Bhagavad Gita, tr. Besant) — all public-domain translations, with wording and verse numbering verified against Bible Gateway, Quran.com, Sefaria, and Wikisource. Content is curated to be wellness-supportive and respectful of all groups, and your selection is **encrypted** — the server never learns your religion.
 - **Word of the day** — a rotating feeling or wellbeing term with a plain-language definition, chosen deterministically per day and skewed toward gentler words so it never leads with a heavy one.
 - **Resources** — a vetted directory of crisis lines and support (988 Suicide & Crisis Lifeline, Crisis Text Line, SAMHSA), gambling and addiction help, therapist directories, and an international fallback — reachable by anyone, signed in or not.
@@ -58,7 +59,7 @@ Then open the URL printed in the console. The app is wired to a live Supabase pr
 
 ## Tests
 
-Unit tests cover the pure logic — auth/JWT parsing, encryption-service wiring, the emotion taxonomy, tip selection and the tip library's data integrity (every tip cited, ids unique), the gentler word-of-the-day pool, streak and shout tracking, tip history, recovery-milestone math, the faith passage library and its mood cascade, theming, and pagination math:
+Unit tests cover the pure logic — auth/JWT parsing, encryption-service wiring, the emotion taxonomy, tip selection and the tip library's data integrity (every tip cited, ids unique), the gentler word-of-the-day pool, streak and shout tracking, tip history, recovery-milestone math, sleep metrics (time-in-bed across midnight, estimated sleep, week/month aggregation) and encrypted-payload round-tripping, the faith passage library and its mood cascade, theming, and pagination math:
 
 ```bash
 dotnet test tests/DoWellToDoGood.Tests/DoWellToDoGood.Tests.csproj -p:SkipTailwind=true
@@ -71,11 +72,11 @@ dotnet test tests/DoWellToDoGood.Tests/DoWellToDoGood.Tests.csproj -p:SkipTailwi
 ```
 do-well-to-do-good/
 ├─ src/DoWellToDoGood/
-│  ├─ Pages/        # Routable pages: Home, Journal, Entries (My journal), Therapy, Recovery, Signin (Account), Resources, Palette
+│  ├─ Pages/        # Routable pages: Home, Journal, Entries (My journal), Sleep + Sleep review, Therapy, Recovery, Signin (Account), Resources, Palette
 │  ├─ Layout/       # App shell: MainLayout, NavMenu
 │  ├─ Components/   # Reusable UI: EmotionWheel, VaultGate (encryption setup/unlock), OpenGoalsReminder, SobrietyCounters, DefinitionOfDay, FaithPassageOfDay
-│  ├─ Models/       # Emotions taxonomy, cited Tips library, WellnessTerms vocabulary, recovery Milestones + encouragement, FaithLibrary
-│  ├─ Services/     # Auth, Crypto, Entries, Therapy, Sobriety, Faith, Stats, Theme, TipHistory, Pagination, SupabaseConfig
+│  ├─ Models/       # Emotions taxonomy, cited Tips library, WellnessTerms vocabulary, recovery Milestones + encouragement, Sleep metrics, FaithLibrary
+│  ├─ Services/     # Auth, Crypto, Entries, Therapy, Sobriety, Sleep, Faith, Stats, Theme, TipHistory, Pagination, SupabaseConfig
 │  ├─ Styles/       # tailwind.css (source) → wwwroot/css/app.css (generated)
 │  ├─ wwwroot/      # Static assets: icons, fonts, js (theme / wheel / crypto), index.html
 │  └─ package.json  # Tailwind CLI + self-hosted Quicksand
@@ -92,13 +93,14 @@ Privacy is the core design principle, not an afterthought:
 - **Saved entries use zero-knowledge encryption.** On first save you set an encryption passphrase; a key derived from it (Web Crypto PBKDF2) unwraps a random, per-user data key that AES-GCM-encrypts each entry's body and emotion. The server only ever stores ciphertext — unreadable by anyone, including a database administrator. A one-time **recovery code** is the only backup; losing both the passphrase and the recovery code means the entries are unrecoverable **by design**. The data key lives only in browser memory and is wiped on lock, sign-out, or page close.
 - **Therapy notes are encrypted the same way.** Session notes, goals, and progress entries are AES-GCM-encrypted in the browser with that same per-user key. The only plaintext stored is a goal's optional target date — low-sensitivity metadata, kept in the clear so the app can sort and remind by it without decrypting everything.
 - **Recovery counters go a step further** — even the clean-since date and day count are encrypted, not just the label. A bare row with a recent date could otherwise hint to a database admin that someone just had a setback, so nothing but an opaque blob is ever stored (id, an owner reference, and a timestamp aside).
+- **Sleep logs are encrypted too.** Your bedtimes, wake-ups, what kept you up, and naps are all inside the vault; the only plaintext is the night's date, kept in the clear so the app can order nights and open one for editing without decrypting the whole history. The week/month review is computed in the browser from decrypted entries — the server never sees a single sleep figure.
 - **Religion is treated as strictly private.** Your selected belief traditions are encrypted in your vault like everything else — never a plaintext column — because even knowing *which* faith someone picked is sensitive. And all scripture ships **inside the app**: it's never fetched from an outside scripture service at runtime, which would leak your faith and IP to a third party (the same reason fonts are self-hosted).
 - **Passwordless auth** — email magic links only, so there's no password to leak. The database enforces per-user Row-Level Security, so a request can only ever touch its owner's rows.
 - **No third-party tracking** — no profiling analytics and no third-party font CDNs (Quicksand is self-hosted), so visiting the app doesn't leak your data to outside services.
 
 ## Deployment
 
-Pushes to `main` are published to **GitHub Pages** by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): it publishes the Blazor WASM app to static files, rewrites the base href for the project subpath, adds an SPA 404 fallback for deep links, and disables Jekyll so Blazor's `_framework` folder is served intact.
+Pushes to `main` are published to **GitHub Pages** by [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): it publishes the Blazor WASM app to static files, rewrites the base href for the project subpath, stamps a content hash onto the `app.css` link so a fresh deploy isn't masked by a cached stylesheet, adds an SPA 404 fallback for deep links, and disables Jekyll so Blazor's `_framework` folder is served intact.
 
 ## Roadmap
 
