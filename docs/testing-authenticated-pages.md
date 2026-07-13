@@ -17,12 +17,19 @@ git-ignored file, and the `service_role` key is never used.
    - Tick **Auto Confirm User**.
    - Make sure the **Email** provider (with password) is enabled under
      Authentication → Providers.
-2. **Fill in the local credentials** (this file is git-ignored):
+2. **Store the credentials outside the repo** — so they're shared across sessions
+   on this machine and can never be committed. Create `~/.dwtdg/dev-credentials.json`
+   from the template:
    ```sh
-   cp dev-credentials.example.json dev-credentials.local.json
+   mkdir -p ~/.dwtdg
+   cp dev-credentials.example.json ~/.dwtdg/dev-credentials.json
    ```
    Set `email`, `password`, and a `vaultPassphrase` (≥ 10 characters) of your
    choosing. Leave `recoveryCode` blank for now.
+
+   `dev-login.ps1` finds this automatically. (A git-ignored
+   `dev-credentials.local.json` in the repo root is also accepted as a fallback,
+   or point `DWTDG_DEV_CREDENTIALS` at any path.)
 3. **Set up the vault once** (see below). When the "Set up your private key" step
    shows a one-time recovery code, paste it into `recoveryCode` in the local file.
 
@@ -55,7 +62,9 @@ local file.
 
 ## Security notes
 
-- `dev-credentials.local.json` is git-ignored — never commit it.
+- Credentials live at `~/.dwtdg/dev-credentials.json` — **outside the repo**, so
+  they're never committed and are shared across sessions on this machine. (The
+  repo-root `dev-credentials.local.json` fallback is git-ignored either way.)
 - Only the publishable key (already shipped in the client) is used; the
   `service_role` key is never used or stored.
 - If you rotate the test account, just update the local file.
