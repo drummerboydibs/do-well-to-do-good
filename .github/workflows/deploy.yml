@@ -49,6 +49,17 @@ jobs:
           sed -i "s|css/app.css|css/app.css?v=$hash|g" release/wwwroot/index.html
           echo "Stamped app.css?v=$hash"
 
+      # Same problem for our hand-written JS (stable names, CDN-cached). Stamp a
+      # content hash so an updated crypto.js/theme.js/wheel.js is a fresh URL and
+      # never served stale after a deploy.
+      - name: Cache-bust app JS
+        run: |
+          for f in crypto theme wheel; do
+            hash=$(md5sum release/wwwroot/js/$f.js | cut -c1-10)
+            sed -i "s|js/$f.js|js/$f.js?v=$hash|g" release/wwwroot/index.html
+            echo "Stamped $f.js?v=$hash"
+          done
+
       # Client-side routing fallback: serve the app for unknown paths / deep links
       - name: Add SPA 404 fallback
         run: cp release/wwwroot/index.html release/wwwroot/404.html

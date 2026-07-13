@@ -1,23 +1,44 @@
-@using DoWellToDoGood.Services
+@* Desktop primary nav — a horizontal pill row. Hidden on phones, where
+   BottomNav takes over. Home and Account are fixed anchors; everything in
+   between is the user's chosen, ordered, visible set. *@
 @implements IDisposable
 @inject AuthService Auth
+@inject NavPrefsService NavPrefs
+@inject NavigationManager Nav
 
-<nav class="flex gap-x-3 gap-y-2 items-center flex-wrap justify-center" aria-label="Primary">
-    <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink>
-    <NavLink class="nav-link" href="journal">Write</NavLink>
-    @if (Auth.IsSignedIn)
+<nav class="hidden sm:flex gap-x-1 gap-y-2 items-center flex-wrap justify-center" aria-label="Primary">
+    <NavLink class="nav-link" href="" Match="NavLinkMatch.All" aria-current="@CurrentMark("")">Home</NavLink>
+
+    @foreach (var item in NavPrefs.VisibleItems(Auth.IsSignedIn))
     {
-        <NavLink class="nav-link" href="entries">My journal</NavLink>
-        <NavLink class="nav-link" href="sleep">Sleep</NavLink>
-        <NavLink class="nav-link" href="therapy">Therapy</NavLink>
-        <NavLink class="nav-link" href="recovery">Recovery</NavLink>
+        <NavLink class="nav-link" href="@item.Href" aria-current="@CurrentMark(item.Href)">@item.Label</NavLink>
     }
-    <NavLink class="nav-link" href="resources">Resources</NavLink>
-    <NavLink class="nav-link" href="signin">@(Auth.IsSignedIn ? "Account" : "Sign in")</NavLink>
+
+    <NavLink class="nav-link" href="signin" aria-current="@CurrentMark("signin")">@(Auth.IsSignedIn ? "Account" : "Sign in")</NavLink>
 </nav>
 
 @code {
-    protected override void OnInitialized() => Auth.Changed += OnAuthChanged;
-    private void OnAuthChanged() => _ = InvokeAsync(StateHasChanged);
-    public void Dispose() => Auth.Changed -= OnAuthChanged;
+    private string? CurrentMark(string href)
+    {
+        var current = Nav.ToBaseRelativePath(Nav.Uri).TrimEnd('/');
+        return string.Equals(current, href.TrimEnd('/'), StringComparison.OrdinalIgnoreCase) ? "page" : null;
+    }
+
+    protected override void OnInitialized()
+    {
+        Auth.Changed += OnChanged;
+        NavPrefs.Changed += OnChanged;
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? _, LocationChangedEventArgs __) => _ = InvokeAsync(StateHasChanged);
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Auth.Changed -= OnChanged;
+        NavPrefs.Changed -= OnChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+    }
 }

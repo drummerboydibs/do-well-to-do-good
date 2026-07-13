@@ -1,0 +1,57 @@
+@* Line icons for navigation, matching the stroke style used on the Home cards.
+   One place to map a NavCatalog icon name → SVG. Decorative by default. *@
+
+<svg width="@Size" height="@Size" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="@Class">
+    @switch (Name)
+    {
+        case "home":
+            <path d="M3 10.5 12 3l9 7.5" />
+            <path d="M5 9.5V20h5v-5h4v5h5V9.5" />
+            break;
+        case "pencil":
+            <path d="M4 20h4L19 9a2.5 2.5 0 0 0-3.5-3.5L4 16.5V20z" />
+            <path d="M14 6.5l3.5 3.5" />
+            break;
+        case "book":
+            <rect x="5" y="3" width="14" height="18" rx="2" />
+            <path d="M9 3v18" />
+            break;
+        case "moon":
+            <path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z" />
+            break;
+        case "chat":
+            <path d="M20 4H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h3v3l4-3h9a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1z" />
+            break;
+        case "sprout":
+            <path d="M12 20v-7" />
+            <path d="M12 13c0-3 2-5.5 6.5-5.5C18.5 10.5 16.5 13 12 13z" />
+            <path d="M12 15c0-2.6-2-4.8-6.5-4.8C5.5 12.8 7.5 15 12 15z" />
+            break;
+        case "compass":
+            <circle cx="12" cy="12" r="9" />
+            <path d="m15.5 8.5-2 5-5 2 2-5z" />
+            break;
+        case "user":
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
+            break;
+        case "more":
+            <circle cx="5" cy="12" r="1.4" />
+            <circle cx="12" cy="12" r="1.4" />
+            <circle cx="19" cy="12" r="1.4" />
+            break;
+        case "sliders":
+            <path d="M4 21v-6" /><path d="M4 11V3" />
+            <path d="M12 21v-9" /><path d="M12 8V3" />
+            <path d="M20 21v-4" /><path d="M20 13V3" />
+            <path d="M1.5 15h5" /><path d="M9.5 8h5" /><path d="M17.5 17h5" />
+            break;
+    }
+</svg>
+
+@code {
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public int Size { get; set; } = 24;
+    [Parameter] public string? Class { get; set; }
+}

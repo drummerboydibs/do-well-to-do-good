@@ -1,0 +1,136 @@
+@* Mobile primary nav — a fixed bottom tab bar (Option A). Shown only on
+   phones (sm:hidden). Home is the first tab; then the user's first few
+   visible pages; the rest, plus Account, live in a "More" sheet. *@
+@implements IDisposable
+@inject AuthService Auth
+@inject NavPrefsService NavPrefs
+@inject NavigationManager Nav
+
+<nav class="bottom-nav sm:hidden" aria-label="Primary">
+    <NavLink class="bottom-nav-item" href="" Match="NavLinkMatch.All" aria-current="@CurrentMark("")">
+        <NavIcon Name="home" Size="22" />
+        <span>Home</span>
+    </NavLink>
+
+    @foreach (var item in _tabs)
+    {
+        <NavLink class="bottom-nav-item" href="@item.Href" aria-current="@CurrentMark(item.Href)">
+            <NavIcon Name="@item.Icon" Size="22" />
+            <span>@item.ShortLabel</span>
+        </NavLink>
+    }
+
+    <button type="button" class="bottom-nav-item @(_moreActive ? "active" : "")" @ref="_moreBtn"
+            aria-haspopup="dialog" aria-expanded="@(_sheetOpen ? "true" : "false")" @onclick="ToggleSheet">
+        <NavIcon Name="more" Size="22" />
+        <span>More</span>
+    </button>
+</nav>
+
+@if (_sheetOpen)
+{
+    <div class="sheet-scrim sm:hidden" @onclick="CloseSheet"></div>
+    <div class="sheet sm:hidden" role="dialog" aria-modal="true" aria-label="More navigation"
+         tabindex="-1" @ref="_sheetEl" @onkeydown="HandleSheetKeydown">
+        <div class="sheet-grip" aria-hidden="true"></div>
+        <div class="grid grid-cols-3 gap-2 pt-1">
+            @foreach (var item in _overflow)
+            {
+                <NavLink class="sheet-item" href="@item.Href" aria-current="@CurrentMark(item.Href)">
+                    <NavIcon Name="@item.Icon" Size="24" />
+                    <span>@item.ShortLabel</span>
+                </NavLink>
+            }
+            <NavLink class="sheet-item" href="signin" aria-current="@CurrentMark("signin")">
+                <NavIcon Name="user" Size="24" />
+                <span>@(Auth.IsSignedIn ? "Account" : "Sign in")</span>
+            </NavLink>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _sheetOpen;
+    private ElementReference _moreBtn;   // focus returns here when the sheet closes
+    private ElementReference _sheetEl;   // focus moves here when the sheet opens
+    private bool _focusSheet, _restoreFocus;
+    private IReadOnlyList<NavItem> _visible = Array.Empty<NavItem>();
+
+    /// <summary>"page" for the active route (so screen readers announce it), else null (attribute omitted).</summary>
+    private string? CurrentMark(string href) => IsCurrent(href) ? "page" : null;
+
+    // First few visible items become tabs; the remainder spill into the sheet.
+    private IEnumerable<NavItem> _tabs => _visible.Take(NavPrefsService.BottomBarSlots);
+    private IEnumerable<NavItem> _overflow => _visible.Skip(NavPrefsService.BottomBarSlots);
+
+    private bool _moreActive =>
+        _overflow.Any(i => IsCurrent(i.Href)) || IsCurrent("signin");
+
+    protected override void OnInitialized()
+    {
+        Recompute();
+        Auth.Changed += OnStateChanged;
+        NavPrefs.Changed += OnStateChanged;
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void Recompute() => _visible = NavPrefs.VisibleItems(Auth.IsSignedIn);
+
+    private void OnStateChanged()
+    {
+        Recompute();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLocationChanged(object? _, LocationChangedEventArgs __)
+    {
+        _sheetOpen = false; // navigating away closes the sheet
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleSheet()
+    {
+        _sheetOpen = !_sheetOpen;
+        if (_sheetOpen) _focusSheet = true; // pull focus into the dialog once it renders
+    }
+
+    private void CloseSheet()
+    {
+        if (!_sheetOpen) return;
+        _sheetOpen = false;
+        _restoreFocus = true; // hand focus back to the button that opened it
+    }
+
+    private void HandleSheetKeydown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Escape") CloseSheet();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusSheet)
+        {
+            _focusSheet = false;
+            try { await _sheetEl.FocusAsync(); } catch { /* not in DOM (desktop) */ }
+        }
+        else if (_restoreFocus)
+        {
+            _restoreFocus = false;
+            try { await _moreBtn.FocusAsync(); } catch { }
+        }
+    }
+
+    private bool IsCurrent(string href)
+    {
+        var current = Nav.ToBaseRelativePath(Nav.Uri).TrimEnd('/');
+        var target = href.TrimEnd('/');
+        return string.Equals(current, target, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        Auth.Changed -= OnStateChanged;
+        NavPrefs.Changed -= OnStateChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+}

@@ -307,6 +307,72 @@ html[data-theme="dark"] #blazor-error-ui {
     .nav-link:hover { background: var(--color-primary-soft); color: var(--color-primary-hover); }
     .nav-link.active { background: var(--color-primary); color: #fff; }
 
+    /* App shell — the wide container (≈900px) for the header/footer chrome and
+       dashboard/grid content. Prose keeps its own narrower max-width for a
+       comfortable reading measure, so it isn't affected by this. */
+    .shell { @apply mx-auto w-full px-6; max-width: 900px; }
+
+    /* ---- Mobile bottom tab bar (primary nav on phones) ---- */
+    .bottom-nav {
+        position: fixed; inset-inline: 0; bottom: 0; z-index: 30;
+        display: flex; align-items: stretch;
+        border-top: 1px solid var(--color-line);
+        background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+        backdrop-filter: blur(10px);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    .bottom-nav-item {
+        flex: 1 1 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 3px;
+        min-height: 3.6rem; padding: 6px 2px;
+        font-size: 0.68rem; font-weight: 600; line-height: 1.1; text-align: center;
+        color: var(--color-muted); background: none; border: none; cursor: pointer;
+        text-decoration: none; transition: color 0.15s ease;
+    }
+    .bottom-nav-item:hover { color: var(--color-ink); }
+    .bottom-nav-item.active { color: var(--color-primary); }
+    .bottom-nav-item.active svg { stroke-width: 2.4; }
+
+    /* Keep the fixed bar from hiding the footer on phones. */
+    @media (max-width: 639.98px) {
+        .has-bottom-nav { margin-bottom: calc(3.6rem + env(safe-area-inset-bottom)); }
+    }
+
+    /* ---- "More" sheet ---- */
+    .sheet-scrim { position: fixed; inset: 0; z-index: 35; background: rgba(15, 26, 34, 0.38); }
+    .sheet {
+        position: fixed; inset-inline: 0; bottom: 0; z-index: 40;
+        background: var(--color-surface);
+        border-top-left-radius: var(--radius-bubble-xl);
+        border-top-right-radius: var(--radius-bubble-xl);
+        border-top: 1px solid var(--color-line);
+        box-shadow: var(--shadow-soft-lg);
+        padding: 0.25rem 1rem calc(1rem + env(safe-area-inset-bottom));
+        animation: sheet-rise 0.22s ease;
+    }
+    @keyframes sheet-rise { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .sheet-grip { width: 2.5rem; height: 0.3rem; border-radius: 999px; background: var(--color-line-strong); margin: 0.5rem auto 0.25rem; }
+    .sheet-item {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+        padding: 0.9rem 0.4rem; border-radius: var(--radius-bubble); text-align: center;
+        color: var(--color-ink); text-decoration: none; font-size: 0.8rem; font-weight: 600;
+        background: var(--color-surface-2); border: 1px solid var(--color-line);
+        transition: transform 0.12s ease, box-shadow 0.12s ease, color 0.12s ease;
+    }
+    .sheet-item:hover { transform: translateY(-1px); box-shadow: var(--shadow-soft-sm); color: var(--color-primary-hover); }
+    .sheet-item.active { border-color: var(--color-primary); color: var(--color-primary-hover); box-shadow: inset 0 0 0 1px var(--color-primary); }
+
+    /* Compact round control used by the Account nav editor (up / down). */
+    .nav-ctl {
+        @apply inline-flex items-center justify-center rounded-full cursor-pointer;
+        min-width: 2.2rem; min-height: 2.2rem; font-weight: 700; font-size: 0.95rem;
+        background: var(--color-surface); color: var(--color-ink);
+        border: 1.5px solid var(--color-line-strong);
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    .nav-ctl:hover:not(:disabled) { background: var(--color-primary-soft); color: var(--color-primary-hover); }
+    .nav-ctl:disabled { opacity: 0.4; cursor: not-allowed; }
+
     .chip {
         @apply inline-flex items-center font-semibold rounded-full px-4 min-h-[2.5rem] cursor-pointer transition;
         background: var(--chip-soft, var(--color-surface-2));

@@ -122,5 +122,8 @@ window.dwtdgCrypto = (() => {
 
 window.dwtdgUtil = {
     clearHash: () => history.replaceState(null, "", location.pathname + location.search),
-    copy: (text) => navigator.clipboard.writeText(text)
+    copy: (text) => navigator.clipboard.writeText(text),
+    // Move keyboard focus to an element by id (used to keep focus on a nav
+    // reorder control after the list re-renders). No-op if it's gone.
+    focusById: (id) => { document.getElementById(id)?.focus(); }
 };
