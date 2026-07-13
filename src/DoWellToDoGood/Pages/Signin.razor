@@ -7,6 +7,7 @@
 @inject StatsService Stats
 @inject ThemeService Theme
 @inject FaithService Faith
+@inject NavPrefsService NavPrefs
 @inject NavigationManager Nav
 
 <PageTitle>@(Auth.IsSignedIn ? "Account" : "Sign in") — Do Well to Do Good</PageTitle>
@@ -86,6 +87,44 @@
                             </label>
                         }
                     </fieldset>
+                </section>
+
+                <section aria-labelledby="nav-heading" class="space-y-2">
+                    <h2 id="nav-heading" class="text-base font-bold m-0">Navigation</h2>
+                    <p class="text-muted text-sm m-0">
+                        Choose which pages show and their order. On phones the first few become tabs
+                        on the bottom bar; the rest tuck under “More.” Home and Account always stay put.
+                        Your layout is encrypted and synced to your devices — only you can read it.
+                    </p>
+                    @{
+                        var navItems = NavPrefs.EditorItems();
+                    }
+                    <ul class="list-none p-0 m-0 space-y-2 pt-1">
+                        @for (var idx = 0; idx < navItems.Count; idx++)
+                        {
+                            var item = navItems[idx];
+                            var i = idx;
+                            var hidden = NavPrefs.IsHidden(item.Key);
+                            <li class="flex items-center gap-2 rounded-bubble px-3 py-2"
+                                style="background:var(--color-surface-2); border:1px solid var(--color-line);">
+                                <span class="inline-flex items-center justify-center w-9 h-9 rounded-full shrink-0"
+                                      style="color:var(--color-primary); background:var(--color-primary-soft)" aria-hidden="true">
+                                    <NavIcon Name="@item.Icon" Size="20" />
+                                </span>
+                                <span class="font-semibold flex-1 min-w-0 @(hidden ? "opacity-50" : "")">@item.Label</span>
+                                <button type="button" class="nav-ctl" aria-label="Move @item.Label up"
+                                        disabled="@(i == 0)" @onclick="() => NavPrefs.MoveAsync(item.Key, -1)">↑</button>
+                                <button type="button" class="nav-ctl" aria-label="Move @item.Label down"
+                                        disabled="@(i == navItems.Count - 1)" @onclick="() => NavPrefs.MoveAsync(item.Key, 1)">↓</button>
+                                <label class="inline-flex items-center cursor-pointer shrink-0 pl-1">
+                                    <input type="checkbox" checked="@(!hidden)"
+                                           @onchange="e => NavPrefs.ToggleHiddenAsync(item.Key, !(bool)e.Value!)" />
+                                    <span class="sr-only">Show @item.Label</span>
+                                </label>
+                            </li>
+                        }
+                    </ul>
+                    <button type="button" class="btn btn-ghost" @onclick="() => NavPrefs.ResetAsync()">Reset to default</button>
                 </section>
 
                 <section aria-labelledby="faith-heading" class="space-y-2">

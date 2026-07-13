@@ -18,7 +18,7 @@
     </div>
 
     <header class="sticky top-0 z-10 border-b border-line app-bar backdrop-blur">
-        <div class="mx-auto max-w-5xl px-6 py-3 flex flex-col items-center gap-2 sm:flex-row sm:justify-between sm:gap-4">
+        <div class="shell py-3 flex items-center justify-between gap-4">
             <a class="inline-flex items-center gap-2 no-underline shrink-0" href="">
                 <img class="w-7 h-7 shrink-0 drop-shadow-sm" src="icons/icon.svg" alt="" width="28" height="28" />
                 <span class="brand-word text-lg sm:text-xl whitespace-nowrap">do <span class="brand-well">well</span> to do <span class="brand-good">good</span></span>
@@ -31,8 +31,8 @@
         @Body
     </main>
 
-    <footer class="relative z-[1] border-t border-line mt-12 py-6 app-bar app-bar--soft backdrop-blur">
-        <div class="mx-auto max-w-5xl px-6 flex items-center justify-between gap-4 flex-wrap">
+    <footer class="relative z-[1] border-t border-line mt-12 py-6 app-bar app-bar--soft backdrop-blur has-bottom-nav">
+        <div class="shell flex items-center justify-between gap-4 flex-wrap">
             <div class="text-muted text-sm space-y-1">
                 <p class="m-0">Designed from the ground up for privacy. Your words are yours.</p>
                 <p class="m-0">Built by Dylan Smith and Claude in 2026.</p>
@@ -44,5 +44,7 @@
             </div>
         </div>
     </footer>
+
+    <BottomNav />
 
 </div>

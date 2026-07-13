@@ -1,23 +1,33 @@
-@using DoWellToDoGood.Services
+@* Desktop primary nav — a horizontal pill row. Hidden on phones, where
+   BottomNav takes over. Home and Account are fixed anchors; everything in
+   between is the user's chosen, ordered, visible set. *@
 @implements IDisposable
 @inject AuthService Auth
+@inject NavPrefsService NavPrefs
 
-<nav class="flex gap-x-3 gap-y-2 items-center flex-wrap justify-center" aria-label="Primary">
+<nav class="hidden sm:flex gap-x-1 gap-y-2 items-center flex-wrap justify-center" aria-label="Primary">
     <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink>
-    <NavLink class="nav-link" href="journal">Write</NavLink>
-    @if (Auth.IsSignedIn)
+
+    @foreach (var item in NavPrefs.VisibleItems(Auth.IsSignedIn))
     {
-        <NavLink class="nav-link" href="entries">My journal</NavLink>
-        <NavLink class="nav-link" href="sleep">Sleep</NavLink>
-        <NavLink class="nav-link" href="therapy">Therapy</NavLink>
-        <NavLink class="nav-link" href="recovery">Recovery</NavLink>
+        <NavLink class="nav-link" href="@item.Href">@item.Label</NavLink>
     }
-    <NavLink class="nav-link" href="resources">Resources</NavLink>
+
     <NavLink class="nav-link" href="signin">@(Auth.IsSignedIn ? "Account" : "Sign in")</NavLink>
 </nav>
 
 @code {
-    protected override void OnInitialized() => Auth.Changed += OnAuthChanged;
-    private void OnAuthChanged() => _ = InvokeAsync(StateHasChanged);
-    public void Dispose() => Auth.Changed -= OnAuthChanged;
+    protected override void OnInitialized()
+    {
+        Auth.Changed += OnChanged;
+        NavPrefs.Changed += OnChanged;
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Auth.Changed -= OnChanged;
+        NavPrefs.Changed -= OnChanged;
+    }
 }

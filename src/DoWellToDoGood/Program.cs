@@ -18,6 +18,7 @@ builder.Services.AddScoped<FaithService>();
 builder.Services.AddScoped<TipHistoryService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<StatsService>();
+builder.Services.AddScoped<NavPrefsService>();
 
 var host = builder.Build();
 
@@ -26,5 +27,8 @@ await host.Services.GetRequiredService<AuthService>().InitializeAsync();
 
 // Load the saved theme preference so the Account toggle reflects it.
 await host.Services.GetRequiredService<ThemeService>().InitializeAsync();
+
+// Load the saved nav layout so the menus render in the user's chosen order.
+await host.Services.GetRequiredService<NavPrefsService>().InitializeAsync();
 
 await host.RunAsync();

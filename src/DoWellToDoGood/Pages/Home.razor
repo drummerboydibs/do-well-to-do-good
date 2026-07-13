@@ -61,8 +61,37 @@
         <DefinitionOfDay />
     </section>
 
+    @* ===================== Explore — jump to any part of the app ===================== *@
+    <section class="shell py-8">
+        <h2 class="text-center mb-2">Explore</h2>
+        <p class="text-muted text-center mb-8 max-w-2xl mx-auto">
+            Every part of your calm place — jump straight in, or scroll to see what's here.
+        </p>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            @foreach (var item in ExploreItems)
+            {
+                var locked = item.RequiresAuth && !Auth.IsSignedIn;
+                <a class="card no-underline flex gap-4 items-start transition hover:-translate-y-1"
+                   style="color:var(--color-ink)" href="@(locked ? "signin" : item.Href)">
+                    <span class="inline-flex items-center justify-center w-12 h-12 rounded-full shrink-0"
+                          style="color:var(--color-primary); background:var(--color-primary-soft)" aria-hidden="true">
+                        <NavIcon Name="@item.Icon" Size="24" />
+                    </span>
+                    <div class="min-w-0">
+                        <h3 class="mb-1">@item.Label</h3>
+                        <p class="text-muted m-0">@item.Blurb</p>
+                        @if (locked)
+                        {
+                            <p class="text-sm font-semibold mt-2 m-0" style="color:var(--color-primary-hover)">Sign in to unlock →</p>
+                        }
+                    </div>
+                </a>
+            }
+        </div>
+    </section>
+
     @* ===================== Features ===================== *@
-    <section class="mx-auto max-w-5xl px-6 py-8">
+    <section class="shell py-8">
         <h2 class="text-center mb-8">A calm place to come back to yourself</h2>
         <div class="grid sm:grid-cols-2 gap-5">
 
@@ -150,6 +179,10 @@
 </div>
 
 @code {
+    // Every navigable feature (Home and Account are structural, so excluded).
+    private static readonly IReadOnlyList<NavItem> ExploreItems =
+        NavCatalog.All.Where(i => !i.Fixed).ToList();
+
     protected override void OnInitialized() => Auth.Changed += OnChanged;
     private void OnChanged() => _ = InvokeAsync(StateHasChanged);
     public void Dispose() => Auth.Changed -= OnChanged;
