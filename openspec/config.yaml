@@ -1,0 +1,32 @@
+schema: spec-driven
+
+# Project context — shown to AI when creating artifacts.
+context: |
+  Do Well to Do Good — a privacy-first mental wellness app.
+
+  Tech stack:
+  - Blazor WebAssembly (.NET 8), runs entirely in the browser
+  - Tailwind CSS v4 (compiled by the .NET build; wwwroot/css/app.css is a build artifact, not committed)
+  - Supabase for email magic-link auth (GoTrue) and Postgres with per-user Row-Level Security,
+    accessed directly over REST (PostgREST) — there is NO server-side code of our own
+  - Web Crypto API for in-browser key derivation and AES-GCM encryption (no crypto dependencies)
+
+  Core constraints / domain rules:
+  - Zero-knowledge: user data is encrypted in the browser with a key only the user holds;
+    the server stores only ciphertext. Design features so the server never learns sensitive data
+    (e.g. only a record's date is stored in the clear, never its contents).
+  - No passwords — auth is email magic-link only; guest mode needs no account.
+  - Security rests on Row-Level Security + client-side encryption; the Supabase key is publishable.
+  - Accessibility: WCAG 2.2 AA-minded — keyboard navigation, focus management, reduced-motion support.
+  - Wellness content must be from vetted, cited sources and worded gently/non-judgmentally.
+  - Deployed as an installable PWA to GitHub Pages.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
