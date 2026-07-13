@@ -9,6 +9,7 @@
 @inject FaithService Faith
 @inject NavPrefsService NavPrefs
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>@(Auth.IsSignedIn ? "Account" : "Sign in") — Do Well to Do Good</PageTitle>
 
@@ -96,6 +97,7 @@
                         on the bottom bar; the rest tuck under “More.” Home and Account always stay put.
                         Your layout is encrypted and synced to your devices — only you can read it.
                     </p>
+                    <p aria-live="polite" class="sr-only">@_navStatus</p>
                     @{
                         var navItems = NavPrefs.EditorItems();
                     }
@@ -112,19 +114,19 @@
                                     <NavIcon Name="@item.Icon" Size="20" />
                                 </span>
                                 <span class="font-semibold flex-1 min-w-0 @(hidden ? "opacity-50" : "")">@item.Label</span>
-                                <button type="button" class="nav-ctl" aria-label="Move @item.Label up"
-                                        disabled="@(i == 0)" @onclick="() => NavPrefs.MoveAsync(item.Key, -1)">↑</button>
-                                <button type="button" class="nav-ctl" aria-label="Move @item.Label down"
-                                        disabled="@(i == navItems.Count - 1)" @onclick="() => NavPrefs.MoveAsync(item.Key, 1)">↓</button>
+                                <button type="button" id="nav-up-@item.Key" class="nav-ctl" aria-label="Move @item.Label up"
+                                        disabled="@(i == 0)" @onclick="() => MoveNav(item.Key, item.Label, -1)">↑</button>
+                                <button type="button" id="nav-down-@item.Key" class="nav-ctl" aria-label="Move @item.Label down"
+                                        disabled="@(i == navItems.Count - 1)" @onclick="() => MoveNav(item.Key, item.Label, 1)">↓</button>
                                 <label class="inline-flex items-center cursor-pointer shrink-0 pl-1">
                                     <input type="checkbox" checked="@(!hidden)"
-                                           @onchange="e => NavPrefs.ToggleHiddenAsync(item.Key, !(bool)e.Value!)" />
+                                           @onchange="e => ToggleNav(item.Key, item.Label, (bool)e.Value!)" />
                                     <span class="sr-only">Show @item.Label</span>
                                 </label>
                             </li>
                         }
                     </ul>
-                    <button type="button" class="btn btn-ghost" @onclick="() => NavPrefs.ResetAsync()">Reset to default</button>
+                    <button type="button" class="btn btn-ghost" @onclick="ResetNav">Reset to default</button>
                 </section>
 
                 <section aria-labelledby="faith-heading" class="space-y-2">
@@ -230,6 +232,44 @@
             await LoadStatsAsync();
             await Faith.LoadAsync();
         }
+    }
+
+    // ----- Navigation editor -----
+    private string _navStatus = "";       // announced via an aria-live region
+    private string? _navFocusId;          // control to refocus after the list re-renders
+
+    private async Task MoveNav(string key, string label, int delta)
+    {
+        await NavPrefs.MoveAsync(key, delta);
+        var items = NavPrefs.EditorItems();
+        var idx = items.ToList().FindIndex(i => i.Key == key);
+        if (idx < 0) return;
+
+        _navStatus = $"{label} moved to position {idx + 1} of {items.Count}.";
+        // Keep focus on a still-enabled arrow (↑ is disabled at the top, ↓ at the bottom).
+        _navFocusId = delta < 0
+            ? (idx == 0 ? $"nav-down-{key}" : $"nav-up-{key}")
+            : (idx == items.Count - 1 ? $"nav-up-{key}" : $"nav-down-{key}");
+    }
+
+    private async Task ToggleNav(string key, string label, bool show)
+    {
+        await NavPrefs.ToggleHiddenAsync(key, !show);
+        _navStatus = show ? $"{label} shown in navigation." : $"{label} hidden from navigation.";
+    }
+
+    private async Task ResetNav()
+    {
+        await NavPrefs.ResetAsync();
+        _navStatus = "Navigation reset to the default order.";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_navFocusId is null) return;
+        var id = _navFocusId;
+        _navFocusId = null;
+        try { await JS.InvokeVoidAsync("dwtdgUtil.focusById", id); } catch { }
     }
 
     private static readonly FaithTradition[] AllTraditions = Enum.GetValues<FaithTradition>();

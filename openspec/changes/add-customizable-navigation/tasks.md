@@ -38,4 +38,4 @@
 - [x] 7.2 Verify local-cache path in-browser (guest reorder/hide honoured across desktop row and bottom bar)
 - [x] 7.3 Verify encrypted cross-device sync end-to-end with a real signed-in + unlocked session
 - [x] 7.4 Add automated coverage for `NavPrefsService` reconciliation (last-write-wins, catalog reconcile)
-- [ ] 7.5 Accessibility pass: keyboard operation of the editor and bottom-bar/sheet, focus handling
+- [x] 7.5 Accessibility pass: keyboard operation of the editor and bottom-bar/sheet, focus handling
