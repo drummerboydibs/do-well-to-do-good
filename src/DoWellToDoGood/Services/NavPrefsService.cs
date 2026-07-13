@@ -46,7 +46,7 @@ public class NavPrefsService
     }
 
     // Serialised form for both the local cache and the encrypted server payload.
-    private sealed record Wire(
+    internal sealed record Wire(
         [property: JsonPropertyName("order")] List<string> Order,
         [property: JsonPropertyName("hidden")] List<string> Hidden,
         [property: JsonPropertyName("updatedAt")] DateTimeOffset UpdatedAt);
@@ -79,23 +79,32 @@ public class NavPrefsService
         if (!_auth.IsSignedIn || !_crypto.IsUnlocked) return;
 
         var server = await FetchServerAsync();
-        if (server is not null)
+        switch (DecideSync(_updatedAt, server?.UpdatedAt))
         {
-            if (server.UpdatedAt > _updatedAt)
-            {
-                Adopt(server);          // a newer layout from another device wins
+            case SyncAction.AdoptServer:
+                Adopt(server!);          // a newer layout from another device wins
                 await SaveLocalAsync();
                 Changed?.Invoke();
-            }
-            else if (_updatedAt > server.UpdatedAt)
-            {
-                await PushServerAsync(); // this device is ahead — push it up
-            }
+                break;
+            case SyncAction.PushLocal:
+                await PushServerAsync(); // this device is ahead (or server empty) — push it up
+                break;
         }
-        else if (_updatedAt > DateTimeOffset.MinValue)
-        {
-            await PushServerAsync();     // nothing server-side yet, but we have local edits
-        }
+    }
+
+    internal enum SyncAction { None, AdoptServer, PushLocal }
+
+    /// <summary>
+    /// Last-write-wins decision on unlock. A newer server copy is adopted; a
+    /// newer local copy (or the very first customization when the server has
+    /// none) is pushed up; identical timestamps do nothing.
+    /// </summary>
+    internal static SyncAction DecideSync(DateTimeOffset local, DateTimeOffset? server)
+    {
+        if (server is null) return local > DateTimeOffset.MinValue ? SyncAction.PushLocal : SyncAction.None;
+        if (server.Value > local) return SyncAction.AdoptServer;
+        if (local > server.Value) return SyncAction.PushLocal;
+        return SyncAction.None;
     }
 
     // ---- Reads ----------------------------------------------------------
@@ -107,11 +116,14 @@ public class NavPrefsService
         _order.Select(NavCatalog.ById).OfType<NavItem>().ToList();
 
     /// <summary>Visible items for the current auth state, in user order.</summary>
-    public IReadOnlyList<NavItem> VisibleItems(bool signedIn) =>
-        _order.Select(NavCatalog.ById)
-              .OfType<NavItem>()
-              .Where(i => !_hidden.Contains(i.Key) && (signedIn || !i.RequiresAuth))
-              .ToList();
+    public IReadOnlyList<NavItem> VisibleItems(bool signedIn) => ComputeVisible(_order, _hidden, signedIn);
+
+    /// <summary>Pure projection of an order + hidden set to the visible items for an auth state.</summary>
+    internal static IReadOnlyList<NavItem> ComputeVisible(IEnumerable<string> order, ISet<string> hidden, bool signedIn) =>
+        order.Select(NavCatalog.ById)
+             .OfType<NavItem>()
+             .Where(i => !hidden.Contains(i.Key) && (signedIn || !i.RequiresAuth))
+             .ToList();
 
     // ---- Writes ---------------------------------------------------------
 
@@ -125,13 +137,24 @@ public class NavPrefsService
     /// <summary>Move an item earlier (delta &lt; 0) or later (delta &gt; 0) in the order.</summary>
     public Task MoveAsync(string key, int delta)
     {
-        var i = _order.IndexOf(key);
-        if (i < 0) return Task.CompletedTask;
-        var target = Math.Clamp(i + delta, 0, _order.Count - 1);
-        if (target == i) return Task.CompletedTask;
-        _order.RemoveAt(i);
-        _order.Insert(target, key);
+        var moved = ApplyMove(_order, key, delta);
+        if (moved.SequenceEqual(_order)) return Task.CompletedTask; // unknown key or clamped no-op
+        _order = moved;
         return CommitAsync();
+    }
+
+    /// <summary>Pure reorder: returns a new list with <paramref name="key"/> shifted by
+    /// <paramref name="delta"/>, clamped to the ends. Unknown keys return the list unchanged.</summary>
+    internal static List<string> ApplyMove(IReadOnlyList<string> order, string key, int delta)
+    {
+        var result = order.ToList();
+        var i = result.IndexOf(key);
+        if (i < 0) return result;
+        var target = Math.Clamp(i + delta, 0, result.Count - 1);
+        if (target == i) return result;
+        result.RemoveAt(i);
+        result.Insert(target, key);
+        return result;
     }
 
     public Task ResetAsync()
@@ -169,19 +192,30 @@ public class NavPrefsService
     /// </summary>
     private void Reconcile(IEnumerable<string>? savedOrder, IEnumerable<string>? savedHidden)
     {
+        _order = ReconcileOrder(savedOrder);
+        _hidden = ReconcileHidden(savedHidden);
+    }
+
+    /// <summary>Saved order, filtered to known keys (deduped) with any newly-added catalog pages appended.</summary>
+    internal static List<string> ReconcileOrder(IEnumerable<string>? savedOrder)
+    {
         var valid = NavCatalog.DefaultOrder();
         var order = (savedOrder ?? Enumerable.Empty<string>())
             .Where(valid.Contains).Distinct().ToList();
         foreach (var key in valid.Where(k => !order.Contains(k)))
             order.Add(key);
-
-        _order = order;
-        _hidden = (savedHidden ?? Enumerable.Empty<string>()).Where(valid.Contains).ToHashSet();
+        return order;
     }
+
+    /// <summary>Saved hidden set, filtered to known reorderable keys.</summary>
+    internal static HashSet<string> ReconcileHidden(IEnumerable<string>? savedHidden) =>
+        (savedHidden ?? Enumerable.Empty<string>()).Where(NavCatalog.DefaultOrder().Contains).ToHashSet();
 
     private Wire Snapshot() => new(_order.ToList(), _hidden.ToList(), _updatedAt);
 
-    private static Wire? Deserialize(string? raw)
+    internal static string Serialize(Wire wire) => JsonSerializer.Serialize(wire);
+
+    internal static Wire? Deserialize(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return null;
         try { return JsonSerializer.Deserialize<Wire>(raw); }
@@ -192,8 +226,7 @@ public class NavPrefsService
     {
         try
         {
-            var json = JsonSerializer.Serialize(Snapshot());
-            await _js.InvokeVoidAsync("localStorage.setItem", StorageKey, json);
+            await _js.InvokeVoidAsync("localStorage.setItem", StorageKey, Serialize(Snapshot()));
         }
         catch { /* private mode — in-memory order still drives this session */ }
     }
