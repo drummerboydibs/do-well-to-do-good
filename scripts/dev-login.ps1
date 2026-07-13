@@ -8,15 +8,29 @@
 # no secrets in this script or the repo. See docs/testing-authenticated-pages.md.
 [CmdletBinding()]
 param(
-    [string]$CredsPath = "$PSScriptRoot/../dev-credentials.local.json",
+    [string]$CredsPath,
     [string]$BaseUrl = "http://localhost:5080"
 )
 
 $ErrorActionPreference = 'Stop'
 
-if (-not (Test-Path $CredsPath)) {
-    throw "Credentials file not found: $CredsPath`n" +
-          "Copy dev-credentials.example.json to dev-credentials.local.json and fill it in."
+# Resolve the credentials file. Canonical location is OUT of the repo (so it's
+# shared across sessions on this machine and can never be committed). Order:
+#   1. -CredsPath / $env:DWTDG_DEV_CREDENTIALS  (explicit override)
+#   2. ~/.dwtdg/dev-credentials.json            (canonical, out of repo)
+#   3. <repo>/dev-credentials.local.json        (git-ignored fallback)
+if (-not $CredsPath) {
+    $candidates = @(
+        $env:DWTDG_DEV_CREDENTIALS,
+        (Join-Path $HOME '.dwtdg/dev-credentials.json'),
+        (Join-Path $PSScriptRoot '../dev-credentials.local.json')
+    ) | Where-Object { $_ }
+    $CredsPath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+if (-not $CredsPath -or -not (Test-Path $CredsPath)) {
+    throw "No dev credentials found. Create ~/.dwtdg/dev-credentials.json from " +
+          "dev-credentials.example.json (see docs/testing-authenticated-pages.md), " +
+          "or set `$env:DWTDG_DEV_CREDENTIALS to its path."
 }
 $creds = Get-Content $CredsPath -Raw | ConvertFrom-Json
 if ([string]::IsNullOrWhiteSpace($creds.email) -or $creds.email -like 'REPLACE_*') {
