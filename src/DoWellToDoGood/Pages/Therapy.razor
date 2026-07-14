@@ -163,10 +163,59 @@
 
         @* ---------- Open goals ---------- *@
         <section class="space-y-4" aria-labelledby="goals-h">
-            <h2 id="goals-h" class="m-0">Open goals</h2>
-            @if (_openGoals.Count == 0)
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h2 id="goals-h" class="m-0">Open goals</h2>
+                @if (!_showAddGoal)
+                {
+                    <button type="button" class="btn !min-h-0 py-2" @onclick="ToggleAddGoal">+ Add a goal</button>
+                }
+            </div>
+
+            @if (_showAddGoal)
             {
-                <div class="card-soft text-muted">No open goals yet. Add one when you log a session above.</div>
+                <div class="card-soft space-y-3">
+                    <div class="field m-0">
+                        <label class="label" for="new-goal-title">Goal</label>
+                        <input id="new-goal-title" class="input" type="text" maxlength="200"
+                               placeholder="e.g. Take a walk outside three times this week" @bind="_newGoalTitle" />
+                    </div>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <label class="text-sm text-muted" for="new-goal-end">Target date (optional)</label>
+                        <input id="new-goal-end" class="input !min-h-0 py-1 w-auto" type="date" min="@_today" @bind="_newGoalEnd" />
+                        @if (_newGoalEnd is not null)
+                        {
+                            <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => _newGoalEnd = null">Clear date</button>
+                        }
+                    </div>
+                    @if (_sessions.Count > 0)
+                    {
+                        <div class="field m-0">
+                            <label class="label" for="new-goal-session">Link to a session <span class="text-muted font-normal">(optional)</span></label>
+                            <select id="new-goal-session" class="input" @bind="_newGoalSessionKey">
+                                <option value="">Not linked to a session</option>
+                                @foreach (var s in _sessions)
+                                {
+                                    <option value="@s.Id">@FormatDate(s.Date)</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                    @if (_addGoalError is not null)
+                    {
+                        <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_addGoalError</p>
+                    }
+                    <div class="flex gap-2">
+                        <button class="btn btn-primary !min-h-0 py-2" disabled="@_savingGoal" @onclick="SaveNewGoal">
+                            @(_savingGoal ? "Encrypting & saving…" : "Save goal")
+                        </button>
+                        <button class="btn btn-ghost !min-h-0 py-2" @onclick="ToggleAddGoal">Cancel</button>
+                    </div>
+                </div>
+            }
+
+            @if (_openGoals.Count == 0 && !_showAddGoal)
+            {
+                <div class="card-soft text-muted">No open goals yet. Add one when you log a session above, or with “+ Add a goal”.</div>
             }
             @foreach (var g in _openGoals)
             {
@@ -231,6 +280,14 @@
     private readonly List<GoalDraft> _goalDrafts = new() { new() };
     private bool _savingSession, _sessionSaved;
     private string? _sessionError;
+
+    // Standalone "add a goal" (outside the session editor). Optionally tied to a past session.
+    private bool _showAddGoal;
+    private string _newGoalTitle = "";
+    private DateOnly? _newGoalEnd;
+    private string _newGoalSessionKey = "";  // "" = not linked; otherwise a session id
+    private bool _savingGoal;
+    private string? _addGoalError;
 
     private List<GoalVm> _openGoals = new();
     private List<GoalVm> _doneGoals = new();
@@ -374,6 +431,48 @@
         finally
         {
             _savingSession = false;
+        }
+    }
+
+    private void ToggleAddGoal()
+    {
+        _showAddGoal = !_showAddGoal;
+        if (!_showAddGoal) ResetAddGoalForm();
+    }
+
+    private void ResetAddGoalForm()
+    {
+        _newGoalTitle = "";
+        _newGoalEnd = null;
+        _newGoalSessionKey = "";
+        _addGoalError = null;
+    }
+
+    private async Task SaveNewGoal()
+    {
+        _addGoalError = null;
+        if (string.IsNullOrWhiteSpace(_newGoalTitle))
+        {
+            _addGoalError = "Give the goal a short title first.";
+            return;
+        }
+        _savingGoal = true;
+        try
+        {
+            Guid? sessionId = Guid.TryParse(_newGoalSessionKey, out var sid) ? sid : null;
+            var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { title = _newGoalTitle.Trim() }));
+            await Svc.InsertGoalAsync(sessionId, blob, _newGoalEnd);
+            _showAddGoal = false;
+            ResetAddGoalForm();
+            await Load(); // refresh so the goal appears and any linked session lists it
+        }
+        catch
+        {
+            _addGoalError = "Couldn't save the goal. Check your connection and try again.";
+        }
+        finally
+        {
+            _savingGoal = false;
         }
     }
 
