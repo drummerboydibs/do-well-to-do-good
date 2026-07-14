@@ -167,7 +167,7 @@
                 <h2 id="goals-h" class="m-0">Open goals</h2>
                 @if (!_showAddGoal)
                 {
-                    <button type="button" class="btn !min-h-0 py-2" @onclick="ToggleAddGoal">+ Add a goal</button>
+                    <button type="button" class="btn !min-h-0 py-2" aria-label="Add a standalone goal" @onclick="ToggleAddGoal">+ Add a goal</button>
                 }
             </div>
 
@@ -208,7 +208,7 @@
                         <button class="btn btn-primary !min-h-0 py-2" disabled="@_savingGoal" @onclick="SaveNewGoal">
                             @(_savingGoal ? "Encrypting & saving…" : "Save goal")
                         </button>
-                        <button class="btn btn-ghost !min-h-0 py-2" @onclick="ToggleAddGoal">Cancel</button>
+                        <button class="btn btn-ghost !min-h-0 py-2" disabled="@_savingGoal" @onclick="ToggleAddGoal">Cancel</button>
                     </div>
                 </div>
             }
@@ -456,24 +456,34 @@
             _addGoalError = "Give the goal a short title first.";
             return;
         }
+
+        // Snapshot the form before any await, so a mid-save Cancel/reset can't
+        // change what we persist. (Cancel is also disabled while saving.)
+        var title = _newGoalTitle.Trim();
+        var end = _newGoalEnd;
+        Guid? sessionId = Guid.TryParse(_newGoalSessionKey, out var sid) ? sid : null;
+
         _savingGoal = true;
         try
         {
-            Guid? sessionId = Guid.TryParse(_newGoalSessionKey, out var sid) ? sid : null;
-            var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { title = _newGoalTitle.Trim() }));
-            await Svc.InsertGoalAsync(sessionId, blob, _newGoalEnd);
-            _showAddGoal = false;
-            ResetAddGoalForm();
-            await Load(); // refresh so the goal appears and any linked session lists it
+            var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { title }));
+            await Svc.InsertGoalAsync(sessionId, blob, end);
         }
         catch
         {
             _addGoalError = "Couldn't save the goal. Check your connection and try again.";
+            return; // leave the form open so the error is visible
         }
         finally
         {
             _savingGoal = false;
         }
+
+        // Only past a successful insert. Reload outside the try so a reload
+        // failure can't masquerade as (and hide behind a closed form) a save error.
+        _showAddGoal = false;
+        ResetAddGoalForm();
+        await Load(); // refresh so the goal appears and any linked session lists it
     }
 
     private void AddGoalDraft()
