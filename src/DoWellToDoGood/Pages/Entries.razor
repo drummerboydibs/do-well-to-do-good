@@ -49,19 +49,53 @@
         <p class="text-muted">
             @_total saved @(_total == 1 ? "entry" : "entries"), newest first.
         </p>
+        <datalist id="emotion-names">
+            @foreach (var name in _emotionNames)
+            {
+                <option value="@name" />
+            }
+        </datalist>
         <div class="space-y-4">
             @foreach (var e in _entries)
             {
                 <article class="rounded-bubble-lg border border-line shadow-soft-sm p-5"
                          style="border-left:6px solid @e.Tint; background:linear-gradient(180deg, color-mix(in srgb, @e.Tint 14%, var(--color-surface)), var(--color-surface) 70%)">
-                    <header class="flex justify-between items-baseline gap-3 mb-2 flex-wrap">
-                        <span class="font-bold">@(string.IsNullOrWhiteSpace(e.Emotion) ? "Unnamed feeling" : e.Emotion)</span>
-                        <span class="text-muted text-xs">@e.CreatedAt.LocalDateTime.ToString("ddd, MMM d yyyy · h:mm tt")</span>
-                    </header>
-                    <p class="m-0 whitespace-pre-wrap">@e.Body</p>
-                    <footer class="mt-3 text-right">
-                        <button class="btn btn-ghost text-sm" @onclick="() => Delete(e.Id)">Delete</button>
-                    </footer>
+                    @if (e.Editing)
+                    {
+                        <div class="space-y-3">
+                            <div class="field m-0">
+                                <label class="label" for="edit-emotion-@e.Id">Feeling</label>
+                                <input id="edit-emotion-@e.Id" class="input" type="text" list="emotion-names" maxlength="100" @bind="e.EditEmotion" />
+                            </div>
+                            <div class="field m-0">
+                                <label class="label" for="edit-body-@e.Id">Entry</label>
+                                <textarea id="edit-body-@e.Id" class="textarea" rows="6" maxlength="20000" @bind="e.EditBody"></textarea>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="btn btn-primary !min-h-0 py-2" disabled="@string.IsNullOrWhiteSpace(e.EditBody)" @onclick="() => SaveEdit(e)">Save</button>
+                                <button class="btn btn-ghost !min-h-0 py-2" @onclick="() => e.Editing = false">Cancel</button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <header class="flex justify-between items-baseline gap-3 mb-2 flex-wrap">
+                            <span class="font-bold">@(string.IsNullOrWhiteSpace(e.Emotion) ? "Unnamed feeling" : e.Emotion)</span>
+                            <span class="text-muted text-xs">@e.CreatedAt.LocalDateTime.ToString("ddd, MMM d yyyy · h:mm tt")</span>
+                        </header>
+                        <p class="m-0 whitespace-pre-wrap">@e.Body</p>
+                        @if (e.UpdatedAt is { } edited)
+                        {
+                            <p class="text-muted text-xs mt-2 m-0">Edited @edited.LocalDateTime.ToString("MMM d, yyyy · h:mm tt")</p>
+                        }
+                        <footer class="mt-3 flex gap-2 justify-end">
+                            @if (e.Decryptable)
+                            {
+                                <button class="btn btn-ghost text-sm" @onclick="() => StartEdit(e)">Edit</button>
+                            }
+                            <button class="btn btn-ghost text-sm" @onclick="() => Delete(e.Id)">Delete</button>
+                        </footer>
+                    }
                 </article>
             }
         </div>
@@ -101,8 +135,22 @@
     private int _page = 1;
     private int _total;
     private List<DecryptedEntry> _entries = new();
+    private readonly List<string> _emotionNames = EmotionCatalog.AllNames().ToList();
 
-    private record DecryptedEntry(Guid Id, string Body, string Emotion, DateTimeOffset CreatedAt, string Tint);
+    private sealed class DecryptedEntry
+    {
+        public Guid Id;
+        public string Body = "";
+        public string Emotion = "";
+        public DateTimeOffset CreatedAt;
+        public DateTimeOffset? UpdatedAt;
+        public string Tint = "";
+        public bool Decryptable = true;   // false → don't offer Edit (would clobber the ciphertext)
+        // UI state
+        public bool Editing;
+        public string EditBody = "";
+        public string EditEmotion = "";
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -151,6 +199,7 @@
         foreach (var row in rows)
         {
             string body, emotion = "";
+            bool ok = true;
             try
             {
                 var json = await Crypto.DecryptAsync(row.Payload);
@@ -161,11 +210,41 @@
             catch
             {
                 body = "⚠ This entry couldn't be decrypted with the current key.";
+                ok = false;
             }
             var valence = EmotionCatalog.Find(emotion)?.Valence ?? 0;
-            list.Add(new(row.Id, body, emotion, row.CreatedAt, Tint(valence)));
+            list.Add(new DecryptedEntry
+            {
+                Id = row.Id,
+                Body = body,
+                Emotion = emotion,
+                CreatedAt = row.CreatedAt,
+                UpdatedAt = row.UpdatedAt,
+                Tint = Tint(valence),
+                Decryptable = ok
+            });
         }
         return list;
+    }
+
+    private void StartEdit(DecryptedEntry e)
+    {
+        e.EditBody = e.Body;
+        e.EditEmotion = e.Emotion;
+        e.Editing = true;
+    }
+
+    private async Task SaveEdit(DecryptedEntry e)
+    {
+        if (string.IsNullOrWhiteSpace(e.EditBody)) return;
+        var payload = JsonSerializer.Serialize(new { body = e.EditBody, emotion = e.EditEmotion.Trim() });
+        var blob = await Crypto.EncryptAsync(payload);
+        var editedAt = await Store.UpdateEntryAsync(e.Id, blob);
+        e.Body = e.EditBody;
+        e.Emotion = e.EditEmotion.Trim();
+        e.UpdatedAt = editedAt;
+        e.Tint = Tint(EmotionCatalog.Find(e.Emotion)?.Valence ?? 0);
+        e.Editing = false;
     }
 
     private async Task Delete(Guid id)

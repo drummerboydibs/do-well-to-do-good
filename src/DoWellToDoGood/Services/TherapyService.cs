@@ -17,7 +17,10 @@ public class TherapyService(AuthService auth)
     public record SessionRow(
         [property: JsonPropertyName("id")] Guid Id,
         [property: JsonPropertyName("payload")] string Payload,
-        [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);
+        [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
+        [property: JsonPropertyName("updated_at")] DateTimeOffset? UpdatedAt);
+
+    public record SessionPage(IReadOnlyList<SessionRow> Rows, int Total);
 
     public record GoalRow(
         [property: JsonPropertyName("id")] Guid Id,
@@ -40,12 +43,41 @@ public class TherapyService(AuthService auth)
     public Task<Guid> InsertSessionAsync(string payload) =>
         InsertReturningIdAsync("therapy_sessions", new() { ["payload"] = payload });
 
-    public async Task<List<SessionRow>> ListSessionsAsync()
+    /// <summary>
+    /// One page of sessions (newest first) plus the total count, so the UI can
+    /// paginate without decrypting every session. Ordered by <c>created_at</c> —
+    /// the session's own date lives inside the encrypted payload, so the server
+    /// can't sort by it (in practice a session is logged around when it happened,
+    /// so the two orders line up).
+    /// </summary>
+    public async Task<SessionPage> ListSessionsPageAsync(int offset, int limit)
     {
-        using var res = await _http.SendAsync(Req(HttpMethod.Get,
-            "therapy_sessions?select=id,payload,created_at&order=created_at.desc"));
+        var req = Req(HttpMethod.Get,
+            $"therapy_sessions?select=id,payload,created_at,updated_at&order=created_at.desc&offset={offset}&limit={limit}");
+        req.Headers.Add("Prefer", "count=exact");
+        using var res = await _http.SendAsync(req);
         res.EnsureSuccessStatusCode();
-        return await res.Content.ReadFromJsonAsync<List<SessionRow>>() ?? new();
+        var rows = await res.Content.ReadFromJsonAsync<List<SessionRow>>() ?? new();
+        var contentRange =
+            (res.Content.Headers.TryGetValues("Content-Range", out var cv) ? cv.FirstOrDefault() : null)
+            ?? (res.Headers.TryGetValues("Content-Range", out var rv) ? rv.FirstOrDefault() : null);
+        var total = Pagination.ParseContentRangeTotal(contentRange) ?? rows.Count;
+        return new SessionPage(rows, total);
+    }
+
+    /// <summary>
+    /// Replace a session's ciphertext and stamp <c>updated_at</c>; returns the
+    /// timestamp written so the caller can show "edited on …" without a re-fetch.
+    /// </summary>
+    public async Task<DateTimeOffset> UpdateSessionAsync(Guid id, string payload)
+    {
+        var editedAt = DateTimeOffset.UtcNow;
+        await PatchAsync($"therapy_sessions?id=eq.{id}", new()
+        {
+            ["payload"] = payload,
+            ["updated_at"] = editedAt
+        });
+        return editedAt;
     }
 
     public Task DeleteSessionAsync(Guid id) => DeleteAsync($"therapy_sessions?id=eq.{id}");
