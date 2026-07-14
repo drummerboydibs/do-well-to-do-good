@@ -73,7 +73,7 @@ dotnet test tests/DoWellToDoGood.Tests/DoWellToDoGood.Tests.csproj -p:SkipTailwi
 ```
 do-well-to-do-good/
 ├─ src/DoWellToDoGood/
-│  ├─ Pages/        # Routable pages: Home, Journal, Entries (My journal), Sleep + Sleep review, Therapy, Recovery, Signin (Account), Resources, Palette
+│  ├─ Pages/        # Routable pages: Home, Journal, Entries (My journal), Sleep + Sleep review, Therapy, Recovery, Signin (Account), Resources
 │  ├─ Layout/       # App shell: MainLayout, NavMenu (desktop bar), BottomNav (mobile tab bar)
 │  ├─ Components/   # Reusable UI: EmotionWheel, VaultGate (encryption setup/unlock), NavIcon, OpenGoalsReminder, SobrietyCounters, DefinitionOfDay, FaithPassageOfDay
 │  ├─ Models/       # Emotions taxonomy, cited Tips library, WellnessTerms vocabulary, recovery Milestones + encouragement, Sleep metrics, FaithLibrary, NavItems (nav catalog)
