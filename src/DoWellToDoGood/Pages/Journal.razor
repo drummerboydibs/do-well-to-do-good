@@ -290,23 +290,26 @@
             var payload = JsonSerializer.Serialize(new { body = _body, emotion = _emotion.Trim() });
             var blob = await Crypto.EncryptAsync(payload);
             await Entries.InsertEntryAsync(blob);
-
-            _tip = await PickTipAsync();
-            _faithPassage = PickFaithPassage();
-
-            _emotion = string.Empty;
-            _body = string.Empty;
-            _selectedEmotion = null;
-            _showWheel = false;
-            _savedToJournal = true;
-            _released = true;
-            _releaseKey++;
-            _focusResult = true;
         }
         catch
         {
             _saveError = "Couldn't save your entry. Check your connection and try again — your words are still here.";
+            return; // keep the form (and the words) so the error stays truthful
         }
         finally { _saving = false; }
+
+        // Saved. The rest is post-save UI (a matched tip, a faith passage, and
+        // clearing the form) — none of it should be able to report the save as failed.
+        _tip = await PickTipAsync();
+        _faithPassage = PickFaithPassage();
+
+        _emotion = string.Empty;
+        _body = string.Empty;
+        _selectedEmotion = null;
+        _showWheel = false;
+        _savedToJournal = true;
+        _released = true;
+        _releaseKey++;
+        _focusResult = true;
     }
 }

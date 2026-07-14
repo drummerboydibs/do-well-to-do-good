@@ -359,22 +359,25 @@
                 var gblob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { title = d.Title.Trim() }));
                 await Svc.InsertGoalAsync(sessionId, gblob, d.End);
             }
-
-            _sessionNotes = "";
-            _sessionDate = DateOnly.FromDateTime(DateTime.Today);
-            _goalDrafts.Clear();
-            _goalDrafts.Add(new());
-            _sessionSaved = true;
-            await Load();
         }
         catch
         {
             _sessionError = "Couldn't save your session. Check your connection and try again.";
+            return; // leave the form (and the user's notes) intact so the error stays put
         }
         finally
         {
             _savingSession = false;
         }
+
+        // Only past a successful save: reset the form and refresh. Reload outside
+        // the try so a reload failure can't be reported as a save failure.
+        _sessionNotes = "";
+        _sessionDate = DateOnly.FromDateTime(DateTime.Today);
+        _goalDrafts.Clear();
+        _goalDrafts.Add(new());
+        _sessionSaved = true;
+        await Load();
     }
 
     private void AddGoalDraft()
