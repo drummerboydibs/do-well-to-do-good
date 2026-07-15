@@ -48,4 +48,61 @@ public class PaginationTests
     {
         Assert.Equal(expected, Pagination.ClampPage(page, totalItems, pageSize));
     }
+
+    // ---- ParseContentRangeTotal ----
+    // PostgREST returns the grand total after the slash, e.g. "0-9/57".
+
+    [Theory]
+    [InlineData("0-9/57", 57)]
+    [InlineData("0-0/1", 1)]
+    [InlineData("*/0", 0)]            // empty result set
+    [InlineData("0-24/100", 100)]
+    [InlineData(" 0-9/57 ", 57)]      // surrounding whitespace tolerated
+    public void ParseContentRangeTotal_ReadsGrandTotal(string header, int expected)
+    {
+        Assert.Equal(expected, Pagination.ParseContentRangeTotal(header));
+    }
+
+    [Theory]
+    [InlineData("0-9/*")]             // total unknown (count not requested)
+    [InlineData("0-9")]               // no slash at all
+    [InlineData("garbage")]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void ParseContentRangeTotal_MissingOrUnparseable_IsNull(string? header)
+    {
+        Assert.Null(Pagination.ParseContentRangeTotal(header));
+    }
+
+    // ---- TotalFromResponse ----
+    // PostgREST returns Content-Range on the content headers. (TotalFromResponse
+    // also checks the response headers, but .NET classifies Content-Range as a
+    // content header and refuses to put it anywhere else, so that fallback can't
+    // be reached through a normal HttpClient — it's inherited belt-and-braces.)
+
+    private static HttpResponseMessage ResponseWith(string? contentRange)
+    {
+        var res = new HttpResponseMessage { Content = new StringContent("[]") };
+        if (contentRange is not null)
+            res.Content.Headers.TryAddWithoutValidation("Content-Range", contentRange);
+        return res;
+    }
+
+    [Fact]
+    public void TotalFromResponse_ReadsContentRangeFromContentHeaders()
+    {
+        using var res = ResponseWith("0-9/57");
+        Assert.Equal(57, Pagination.TotalFromResponse(res, fallback: 10));
+    }
+
+    [Theory]
+    [InlineData(null)]      // header absent entirely
+    [InlineData("0-9/*")]   // total unknown
+    [InlineData("garbage")]
+    public void TotalFromResponse_MissingOrUnparseable_UsesFallback(string? contentRange)
+    {
+        using var res = ResponseWith(contentRange);
+        Assert.Equal(10, Pagination.TotalFromResponse(res, fallback: 10));
+    }
 }

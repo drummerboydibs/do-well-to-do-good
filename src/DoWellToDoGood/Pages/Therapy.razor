@@ -187,15 +187,15 @@
                             <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => _newGoalEnd = null">Clear date</button>
                         }
                     </div>
-                    @if (_sessions.Count > 0)
+                    @if (_sessionOptions.Count > 0)
                     {
                         <div class="field m-0">
                             <label class="label" for="new-goal-session">Link to a session <span class="text-muted font-normal">(optional)</span></label>
                             <select id="new-goal-session" class="input" @bind="_newGoalSessionKey">
                                 <option value="">Not linked to a session</option>
-                                @foreach (var s in _sessions)
+                                @foreach (var o in _sessionOptions)
                                 {
-                                    <option value="@s.Id">@FormatDate(s.Date)</option>
+                                    <option value="@o.Id">@FormatDate(DateOnly.FromDateTime(o.CreatedAt.LocalDateTime))</option>
                                 }
                             </select>
                         </div>
@@ -242,29 +242,76 @@
             </details>
         }
 
-        @if (_sessions.Count > 0)
+        @if (_sessionTotal > 0)
         {
             <details class="card-soft">
-                <summary class="font-semibold cursor-pointer">Past sessions (@_sessions.Count)</summary>
+                <summary class="font-semibold cursor-pointer">Past sessions (@_sessionTotal)</summary>
                 <div class="space-y-4 mt-3">
                     @foreach (var s in _sessions)
                     {
                         <article class="rounded-bubble border border-line p-4 space-y-2">
-                            <header class="flex justify-between items-baseline gap-3 flex-wrap">
-                                <span class="font-bold">@FormatDate(s.Date)</span>
-                                <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteSession(s)">Delete</button>
-                            </header>
-                            @if (!string.IsNullOrWhiteSpace(s.Notes))
+                            @if (s.Editing)
                             {
-                                <p class="m-0 whitespace-pre-wrap">@s.Notes</p>
+                                <div class="field m-0">
+                                    <label class="label" for="edit-s-date-@s.Id">Session date</label>
+                                    <input id="edit-s-date-@s.Id" class="input" type="date" max="@_today" @bind="s.EditDate" />
+                                </div>
+                                <div class="field m-0">
+                                    <label class="label" for="edit-s-notes-@s.Id">Session notes</label>
+                                    <textarea id="edit-s-notes-@s.Id" class="textarea" rows="5" maxlength="20000" @bind="s.EditNotes"></textarea>
+                                </div>
+                                @if (s.Error is not null)
+                                {
+                                    <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@s.Error</p>
+                                }
+                                <div class="flex gap-2">
+                                    <button class="btn btn-primary !min-h-0 py-2" disabled="@(s.Saving || string.IsNullOrWhiteSpace(s.EditNotes))" @onclick="() => SaveSessionEdit(s)">
+                                        @(s.Saving ? "Encrypting & saving…" : "Save")
+                                    </button>
+                                    <button class="btn btn-ghost !min-h-0 py-2" disabled="@s.Saving" @onclick="() => CancelSessionEdit(s)">Cancel</button>
+                                </div>
                             }
-                            @if (s.GoalTitles.Count > 0)
+                            else
                             {
-                                <p class="text-sm text-muted m-0">Goals set: @string.Join(", ", s.GoalTitles)</p>
+                                <header class="flex justify-between items-baseline gap-3 flex-wrap">
+                                    <span class="font-bold">@FormatDate(s.Date)</span>
+                                    <span class="flex gap-2">
+                                        @if (s.Decryptable)
+                                        {
+                                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => StartSessionEdit(s)">Edit</button>
+                                        }
+                                        <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteSession(s)">Delete</button>
+                                    </span>
+                                </header>
+                                @if (!string.IsNullOrWhiteSpace(s.Notes))
+                                {
+                                    <p class="m-0 whitespace-pre-wrap">@s.Notes</p>
+                                }
+                                @if (s.GoalTitles.Count > 0)
+                                {
+                                    <p class="text-sm text-muted m-0">Goals set: @string.Join(", ", s.GoalTitles)</p>
+                                }
+                                @if (s.UpdatedAt is { } edited)
+                                {
+                                    <p class="text-xs text-muted m-0">Edited @FormatEditedOn(edited)</p>
+                                }
                             }
                         </article>
                     }
                 </div>
+
+                @if (_sessionTotal > SessionPageSize)
+                {
+                    <nav class="flex items-center justify-center gap-3 flex-wrap mt-4" aria-label="Past session pages">
+                        <button class="btn" disabled="@(_sessionPage <= 1)" @onclick="() => GoToSessionsPage(_sessionPage - 1)" aria-label="Show newer sessions">
+                            <span aria-hidden="true">←</span> Newer
+                        </button>
+                        <span class="text-muted text-sm" aria-live="polite">Page @_sessionPage of @Pagination.TotalPages(_sessionTotal, SessionPageSize)</span>
+                        <button class="btn" disabled="@(_sessionPage >= Pagination.TotalPages(_sessionTotal, SessionPageSize))" @onclick="() => GoToSessionsPage(_sessionPage + 1)" aria-label="Show older sessions">
+                            Older <span aria-hidden="true">→</span>
+                        </button>
+                    </nav>
+                }
             </details>
         }
     }
@@ -291,7 +338,20 @@
 
     private List<GoalVm> _openGoals = new();
     private List<GoalVm> _doneGoals = new();
+
+    // Past sessions are paginated (they can pile up). The goal titles created by
+    // each session are keyed here from the full goal list so any page can look
+    // them up without refetching.
     private List<SessionVm> _sessions = new();
+    private Dictionary<Guid, List<string>> _goalTitleBySession = new();
+    private int _sessionTotal;
+    private int _sessionPage = 1;
+    private const int SessionPageSize = 20;
+
+    // Every session (id + logged date only), for the "link to a session" picker.
+    // Deliberately independent of the page above: the picker must offer all
+    // sessions, not just the ones currently paged into view.
+    private List<TherapyService.SessionOption> _sessionOptions = new();
 
     private sealed class GoalDraft { public string Title = ""; public DateOnly? End; }
 
@@ -312,7 +372,22 @@
     }
 
     private sealed record ProgressVm(Guid Id, string Note, DateOnly Date, DateTimeOffset CreatedAt);
-    private sealed record SessionVm(Guid Id, DateOnly Date, string Notes, List<string> GoalTitles);
+
+    private sealed class SessionVm
+    {
+        public Guid Id;
+        public DateOnly Date;
+        public string Notes = "";
+        public DateTimeOffset? UpdatedAt;
+        public List<string> GoalTitles = new();
+        public bool Decryptable = true;   // false → don't offer Edit (would clobber the ciphertext)
+        // UI state
+        public bool Editing;
+        public DateOnly EditDate;
+        public string EditNotes = "";
+        public bool Saving;
+        public string? Error;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -328,7 +403,6 @@
         {
             var goalRows = await Svc.ListGoalsAsync(openOnly: false);
             var progressRows = await Svc.ListAllProgressAsync();
-            var sessionRows = await Svc.ListSessionsAsync();
 
             // Decrypt progress and bucket by goal.
             var progressByGoal = new Dictionary<Guid, List<ProgressVm>>();
@@ -364,32 +438,61 @@
                 .ToList();
             _doneGoals = goals.Where(g => g.Done).OrderByDescending(g => g.CreatedAt).ToList();
 
-            // Decrypt sessions; attach goal titles created from each session.
-            var goalTitleBySession = new Dictionary<Guid, List<string>>();
+            // Map goal titles to the session that created them, so any session
+            // page can show its "Goals set" line without refetching goals.
+            _goalTitleBySession = new();
             foreach (var row in goalRows)
             {
                 if (row.SessionId is { } sid)
                 {
                     var title = goals.First(g => g.Id == row.Id).Title;
-                    if (!goalTitleBySession.TryGetValue(sid, out var l)) goalTitleBySession[sid] = l = new();
+                    if (!_goalTitleBySession.TryGetValue(sid, out var l)) _goalTitleBySession[sid] = l = new();
                     l.Add(title);
                 }
             }
 
-            var sessions = new List<SessionVm>();
-            foreach (var s in sessionRows)
-            {
-                var (date, notes) = await DecryptSession(s.Payload);
-                sessions.Add(new SessionVm(s.Id, date, notes,
-                    goalTitleBySession.TryGetValue(s.Id, out var t) ? t : new()));
-            }
-            _sessions = sessions.OrderByDescending(s => s.Date).ToList();
+            _sessionOptions = await Svc.ListSessionOptionsAsync();
+            await LoadSessionsPage(1);
         }
         finally
         {
             _loading = false;
         }
     }
+
+    private async Task LoadSessionsPage(int page)
+    {
+        var pageData = await Svc.ListSessionsPageAsync((page - 1) * SessionPageSize, SessionPageSize);
+        _sessionTotal = pageData.Total;
+
+        // A deletion can leave us past the last page; fall back to the new last one.
+        var lastPage = Pagination.TotalPages(_sessionTotal, SessionPageSize);
+        if (page > lastPage)
+        {
+            await LoadSessionsPage(lastPage);
+            return;
+        }
+        _sessionPage = page;
+
+        var sessions = new List<SessionVm>();
+        foreach (var s in pageData.Rows)
+        {
+            var (date, notes, ok) = await DecryptSession(s.Payload);
+            sessions.Add(new SessionVm
+            {
+                Id = s.Id,
+                Date = date,
+                Notes = notes,
+                UpdatedAt = s.UpdatedAt,
+                Decryptable = ok,
+                GoalTitles = _goalTitleBySession.TryGetValue(s.Id, out var t) ? t : new()
+            });
+        }
+        _sessions = sessions; // server already returned them newest-first by created_at
+    }
+
+    private Task GoToSessionsPage(int page) =>
+        LoadSessionsPage(Pagination.ClampPage(page, _sessionTotal, SessionPageSize));
 
     private async Task SaveSession()
     {
@@ -562,7 +665,61 @@
     {
         if (!await Confirm("Delete this session? Your goals from it will be kept.")) return;
         await Svc.DeleteSessionAsync(s.Id);
-        _sessions = _sessions.Where(x => x.Id != s.Id).ToList();
+        _sessionOptions = await Svc.ListSessionOptionsAsync(); // drop it from the goal-link picker too
+        // Reload the page so the total and pagination stay accurate (and the freed
+        // slot fills from the next page); falls back a page if this emptied one.
+        await LoadSessionsPage(_sessionPage);
+    }
+
+    private void StartSessionEdit(SessionVm s)
+    {
+        s.EditDate = s.Date;
+        s.EditNotes = s.Notes;
+        s.Error = null;
+        s.Editing = true;
+    }
+
+    private static void CancelSessionEdit(SessionVm s)
+    {
+        s.Editing = false;
+        s.Error = null;
+    }
+
+    private async Task SaveSessionEdit(SessionVm s)
+    {
+        if (string.IsNullOrWhiteSpace(s.EditNotes) || s.Saving) return;
+        s.Error = null;
+
+        // Snapshot before the first await so a mid-save Cancel can't change what
+        // we persist. (Cancel is also disabled while saving.)
+        var date = s.EditDate;
+        var notes = s.EditNotes;
+
+        s.Saving = true;
+        DateTimeOffset editedAt;
+        try
+        {
+            var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new
+            {
+                date = date.ToString("yyyy-MM-dd"),
+                notes
+            }));
+            editedAt = await Svc.UpdateSessionAsync(s.Id, blob);
+        }
+        catch
+        {
+            s.Error = "Couldn't save your changes. Check your connection and try again — your edit is still here.";
+            return; // stay in edit mode so the error (and the edit) are visible
+        }
+        finally
+        {
+            s.Saving = false;
+        }
+
+        s.Date = date;
+        s.Notes = notes;
+        s.UpdatedAt = editedAt;
+        s.Editing = false;
     }
 
     private void ResortOpen() => _openGoals = _openGoals
@@ -573,6 +730,8 @@
     private bool IsOverdue(GoalVm g) => g.End is { } e && e < DateOnly.FromDateTime(DateTime.Today);
 
     private static string FormatDate(DateOnly d) => d.ToString("MMM d, yyyy");
+
+    private static string FormatEditedOn(DateTimeOffset dt) => dt.LocalDateTime.ToString("MMM d, yyyy · h:mm tt");
 
     private Task<bool> Confirm(string message) => JS.InvokeAsync<bool>("confirm", message).AsTask();
 
@@ -604,7 +763,7 @@
         catch { return ("⚠ Couldn't decrypt this note", DateOnly.FromDateTime(DateTime.Today)); }
     }
 
-    private async Task<(DateOnly Date, string Notes)> DecryptSession(string payload)
+    private async Task<(DateOnly Date, string Notes, bool Ok)> DecryptSession(string payload)
     {
         try
         {
@@ -612,8 +771,8 @@
             var date = doc.RootElement.TryGetProperty("date", out var dt) && DateOnly.TryParse(dt.GetString(), out var d)
                 ? d : DateOnly.FromDateTime(DateTime.Today);
             var notes = doc.RootElement.TryGetProperty("notes", out var n) ? n.GetString() ?? "" : "";
-            return (date, notes);
+            return (date, notes, true);
         }
-        catch { return (DateOnly.FromDateTime(DateTime.Today), "⚠ Couldn't decrypt this session"); }
+        catch { return (DateOnly.FromDateTime(DateTime.Today), "⚠ Couldn't decrypt this session", false); }
     }
 }

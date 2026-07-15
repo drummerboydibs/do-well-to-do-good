@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 
@@ -22,7 +21,8 @@ public class EntriesService(AuthService auth)
     public record EntryRow(
         [property: JsonPropertyName("id")] Guid Id,
         [property: JsonPropertyName("payload")] string Payload,
-        [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);
+        [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
+        [property: JsonPropertyName("updated_at")] DateTimeOffset? UpdatedAt);
 
     public async Task<KeyRecord?> GetKeysAsync()
     {
@@ -49,6 +49,26 @@ public class EntriesService(AuthService auth)
         res.EnsureSuccessStatusCode();
     }
 
+    /// <summary>
+    /// Replace an entry's ciphertext and stamp <c>updated_at</c> so the UI can
+    /// show when it was last edited. Returns the timestamp written, so the caller
+    /// can reflect it without a re-fetch. (There is no DB trigger for this — the
+    /// app owns the timestamp, mirroring how the rest of the schema works.)
+    /// </summary>
+    public async Task<DateTimeOffset> UpdateEntryAsync(Guid id, string payload)
+    {
+        var editedAt = DateTimeOffset.UtcNow;
+        var req = Req(HttpMethod.Patch, $"journal_entries?id=eq.{id}");
+        req.Content = JsonContent.Create(new Dictionary<string, object?>
+        {
+            ["payload"] = payload,
+            ["updated_at"] = editedAt
+        });
+        using var res = await _http.SendAsync(req);
+        res.EnsureSuccessStatusCode();
+        return editedAt;
+    }
+
     public record EntryPage(IReadOnlyList<EntryRow> Rows, int Total);
 
     /// <summary>
@@ -69,34 +89,12 @@ public class EntriesService(AuthService auth)
     public async Task<EntryPage> ListEntriesPageAsync(int offset, int limit)
     {
         var req = Req(HttpMethod.Get,
-            $"journal_entries?select=id,payload,created_at&order=created_at.desc&offset={offset}&limit={limit}");
+            $"journal_entries?select=id,payload,created_at,updated_at&order=created_at.desc&offset={offset}&limit={limit}");
         req.Headers.Add("Prefer", "count=exact");
         using var res = await _http.SendAsync(req);
         res.EnsureSuccessStatusCode();
         var rows = await res.Content.ReadFromJsonAsync<List<EntryRow>>() ?? new();
-        // Content-Range is normally a content header, but be tolerant of it
-        // arriving on the response headers; fall back to the page size if absent.
-        var contentRange =
-            (res.Content.Headers.TryGetValues("Content-Range", out var cv) ? cv.FirstOrDefault() : null)
-            ?? (res.Headers.TryGetValues("Content-Range", out var rv) ? rv.FirstOrDefault() : null);
-        var total = ParseContentRangeTotal(contentRange) ?? rows.Count;
-        return new EntryPage(rows, total);
-    }
-
-    /// <summary>
-    /// Pull the total row count out of a PostgREST Content-Range header, which
-    /// looks like "0-9/57" (or "*/0" when empty) — we want the part after the
-    /// slash. Returns null if it's missing, "*", or otherwise unparseable.
-    /// </summary>
-    internal static int? ParseContentRangeTotal(string? contentRange)
-    {
-        if (string.IsNullOrWhiteSpace(contentRange)) return null;
-        var slash = contentRange.IndexOf('/');
-        if (slash < 0) return null;
-        var totalPart = contentRange[(slash + 1)..].Trim();
-        return int.TryParse(totalPart, NumberStyles.Integer, CultureInfo.InvariantCulture, out var total)
-            ? total
-            : null;
+        return new EntryPage(rows, Pagination.TotalFromResponse(res, rows.Count));
     }
 
     public record TimestampRow([property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);

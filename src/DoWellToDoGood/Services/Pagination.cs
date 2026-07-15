@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace DoWellToDoGood.Services;
 
 /// <summary>
@@ -7,6 +9,36 @@ namespace DoWellToDoGood.Services;
 /// </summary>
 public static class Pagination
 {
+    /// <summary>
+    /// The grand total from a PostgREST response asked for with "Prefer: count=exact",
+    /// falling back to <paramref name="fallback"/> when the header is missing or
+    /// unparseable. Content-Range is normally a content header, but we tolerate it
+    /// arriving on the response headers.
+    /// </summary>
+    public static int TotalFromResponse(HttpResponseMessage res, int fallback)
+    {
+        var contentRange =
+            (res.Content.Headers.TryGetValues("Content-Range", out var cv) ? cv.FirstOrDefault() : null)
+            ?? (res.Headers.TryGetValues("Content-Range", out var rv) ? rv.FirstOrDefault() : null);
+        return ParseContentRangeTotal(contentRange) ?? fallback;
+    }
+
+    /// <summary>
+    /// Pull the total row count out of a PostgREST Content-Range header, which
+    /// looks like "0-9/57" (or "*/0" when empty) — we want the part after the
+    /// slash. Returns null if it's missing, "*", or otherwise unparseable.
+    /// </summary>
+    public static int? ParseContentRangeTotal(string? contentRange)
+    {
+        if (string.IsNullOrWhiteSpace(contentRange)) return null;
+        var slash = contentRange.IndexOf('/');
+        if (slash < 0) return null;
+        var totalPart = contentRange[(slash + 1)..].Trim();
+        return int.TryParse(totalPart, NumberStyles.Integer, CultureInfo.InvariantCulture, out var total)
+            ? total
+            : null;
+    }
+
     /// <summary>
     /// How many pages it takes to show <paramref name="totalItems"/> at
     /// <paramref name="pageSize"/> per page. Always at least 1 — an empty list

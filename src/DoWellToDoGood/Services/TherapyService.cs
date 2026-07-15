@@ -17,6 +17,13 @@ public class TherapyService(AuthService auth)
     public record SessionRow(
         [property: JsonPropertyName("id")] Guid Id,
         [property: JsonPropertyName("payload")] string Payload,
+        [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
+        [property: JsonPropertyName("updated_at")] DateTimeOffset? UpdatedAt);
+
+    public record SessionPage(IReadOnlyList<SessionRow> Rows, int Total);
+
+    public record SessionOption(
+        [property: JsonPropertyName("id")] Guid Id,
         [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);
 
     public record GoalRow(
@@ -40,12 +47,53 @@ public class TherapyService(AuthService auth)
     public Task<Guid> InsertSessionAsync(string payload) =>
         InsertReturningIdAsync("therapy_sessions", new() { ["payload"] = payload });
 
-    public async Task<List<SessionRow>> ListSessionsAsync()
+    /// <summary>
+    /// One page of sessions (newest first) plus the total count, so the UI can
+    /// paginate without decrypting every session. Ordered by <c>created_at</c> —
+    /// the session's own date lives inside the encrypted payload, so the server
+    /// can't sort by it (in practice a session is logged around when it happened,
+    /// so the two orders line up).
+    /// </summary>
+    public async Task<SessionPage> ListSessionsPageAsync(int offset, int limit)
+    {
+        var req = Req(HttpMethod.Get,
+            $"therapy_sessions?select=id,payload,created_at,updated_at&order=created_at.desc&offset={offset}&limit={limit}");
+        req.Headers.Add("Prefer", "count=exact");
+        using var res = await _http.SendAsync(req);
+        res.EnsureSuccessStatusCode();
+        var rows = await res.Content.ReadFromJsonAsync<List<SessionRow>>() ?? new();
+        return new SessionPage(rows, Pagination.TotalFromResponse(res, rows.Count));
+    }
+
+    /// <summary>
+    /// Every session as just (id, created_at) — no payloads, so nothing has to be
+    /// fetched in bulk or decrypted. Enough to populate a "link to a session"
+    /// picker with the complete list regardless of which page the user is viewing.
+    /// The label is necessarily the logged date rather than the session's own
+    /// (encrypted) date; the two line up in practice, for the same reason session
+    /// paging orders by created_at.
+    /// </summary>
+    public async Task<List<SessionOption>> ListSessionOptionsAsync()
     {
         using var res = await _http.SendAsync(Req(HttpMethod.Get,
-            "therapy_sessions?select=id,payload,created_at&order=created_at.desc"));
+            "therapy_sessions?select=id,created_at&order=created_at.desc"));
         res.EnsureSuccessStatusCode();
-        return await res.Content.ReadFromJsonAsync<List<SessionRow>>() ?? new();
+        return await res.Content.ReadFromJsonAsync<List<SessionOption>>() ?? new();
+    }
+
+    /// <summary>
+    /// Replace a session's ciphertext and stamp <c>updated_at</c>; returns the
+    /// timestamp written so the caller can show "edited on …" without a re-fetch.
+    /// </summary>
+    public async Task<DateTimeOffset> UpdateSessionAsync(Guid id, string payload)
+    {
+        var editedAt = DateTimeOffset.UtcNow;
+        await PatchAsync($"therapy_sessions?id=eq.{id}", new()
+        {
+            ["payload"] = payload,
+            ["updated_at"] = editedAt
+        });
+        return editedAt;
     }
 
     public Task DeleteSessionAsync(Guid id) => DeleteAsync($"therapy_sessions?id=eq.{id}");
