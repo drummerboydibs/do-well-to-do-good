@@ -187,15 +187,15 @@
                             <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => _newGoalEnd = null">Clear date</button>
                         }
                     </div>
-                    @if (_sessions.Count > 0)
+                    @if (_sessionOptions.Count > 0)
                     {
                         <div class="field m-0">
                             <label class="label" for="new-goal-session">Link to a session <span class="text-muted font-normal">(optional)</span></label>
                             <select id="new-goal-session" class="input" @bind="_newGoalSessionKey">
                                 <option value="">Not linked to a session</option>
-                                @foreach (var s in _sessions)
+                                @foreach (var o in _sessionOptions)
                                 {
-                                    <option value="@s.Id">@FormatDate(s.Date)</option>
+                                    <option value="@o.Id">@FormatDate(DateOnly.FromDateTime(o.CreatedAt.LocalDateTime))</option>
                                 }
                             </select>
                         </div>
@@ -260,9 +260,15 @@
                                     <label class="label" for="edit-s-notes-@s.Id">Session notes</label>
                                     <textarea id="edit-s-notes-@s.Id" class="textarea" rows="5" maxlength="20000" @bind="s.EditNotes"></textarea>
                                 </div>
+                                @if (s.Error is not null)
+                                {
+                                    <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@s.Error</p>
+                                }
                                 <div class="flex gap-2">
-                                    <button class="btn btn-primary !min-h-0 py-2" disabled="@string.IsNullOrWhiteSpace(s.EditNotes)" @onclick="() => SaveSessionEdit(s)">Save</button>
-                                    <button class="btn btn-ghost !min-h-0 py-2" @onclick="() => s.Editing = false">Cancel</button>
+                                    <button class="btn btn-primary !min-h-0 py-2" disabled="@(s.Saving || string.IsNullOrWhiteSpace(s.EditNotes))" @onclick="() => SaveSessionEdit(s)">
+                                        @(s.Saving ? "Encrypting & saving…" : "Save")
+                                    </button>
+                                    <button class="btn btn-ghost !min-h-0 py-2" disabled="@s.Saving" @onclick="() => CancelSessionEdit(s)">Cancel</button>
                                 </div>
                             }
                             else
@@ -342,6 +348,11 @@
     private int _sessionPage = 1;
     private const int SessionPageSize = 20;
 
+    // Every session (id + logged date only), for the "link to a session" picker.
+    // Deliberately independent of the page above: the picker must offer all
+    // sessions, not just the ones currently paged into view.
+    private List<TherapyService.SessionOption> _sessionOptions = new();
+
     private sealed class GoalDraft { public string Title = ""; public DateOnly? End; }
 
     private sealed class GoalVm
@@ -374,6 +385,8 @@
         public bool Editing;
         public DateOnly EditDate;
         public string EditNotes = "";
+        public bool Saving;
+        public string? Error;
     }
 
     protected override async Task OnInitializedAsync()
@@ -438,6 +451,7 @@
                 }
             }
 
+            _sessionOptions = await Svc.ListSessionOptionsAsync();
             await LoadSessionsPage(1);
         }
         finally
@@ -651,6 +665,7 @@
     {
         if (!await Confirm("Delete this session? Your goals from it will be kept.")) return;
         await Svc.DeleteSessionAsync(s.Id);
+        _sessionOptions = await Svc.ListSessionOptionsAsync(); // drop it from the goal-link picker too
         // Reload the page so the total and pagination stay accurate (and the freed
         // slot fills from the next page); falls back a page if this emptied one.
         await LoadSessionsPage(_sessionPage);
@@ -660,21 +675,49 @@
     {
         s.EditDate = s.Date;
         s.EditNotes = s.Notes;
+        s.Error = null;
         s.Editing = true;
+    }
+
+    private static void CancelSessionEdit(SessionVm s)
+    {
+        s.Editing = false;
+        s.Error = null;
     }
 
     private async Task SaveSessionEdit(SessionVm s)
     {
-        if (string.IsNullOrWhiteSpace(s.EditNotes)) return;
-        var payload = JsonSerializer.Serialize(new
+        if (string.IsNullOrWhiteSpace(s.EditNotes) || s.Saving) return;
+        s.Error = null;
+
+        // Snapshot before the first await so a mid-save Cancel can't change what
+        // we persist. (Cancel is also disabled while saving.)
+        var date = s.EditDate;
+        var notes = s.EditNotes;
+
+        s.Saving = true;
+        DateTimeOffset editedAt;
+        try
         {
-            date = s.EditDate.ToString("yyyy-MM-dd"),
-            notes = s.EditNotes
-        });
-        var blob = await Crypto.EncryptAsync(payload);
-        var editedAt = await Svc.UpdateSessionAsync(s.Id, blob);
-        s.Date = s.EditDate;
-        s.Notes = s.EditNotes;
+            var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new
+            {
+                date = date.ToString("yyyy-MM-dd"),
+                notes
+            }));
+            editedAt = await Svc.UpdateSessionAsync(s.Id, blob);
+        }
+        catch
+        {
+            s.Error = "Couldn't save your changes. Check your connection and try again — your edit is still here.";
+            return; // stay in edit mode so the error (and the edit) are visible
+        }
+        finally
+        {
+            s.Saving = false;
+        }
+
+        s.Date = date;
+        s.Notes = notes;
         s.UpdatedAt = editedAt;
         s.Editing = false;
     }

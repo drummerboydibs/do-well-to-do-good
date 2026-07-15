@@ -71,9 +71,15 @@
                                 <label class="label" for="edit-body-@e.Id">Entry</label>
                                 <textarea id="edit-body-@e.Id" class="textarea" rows="6" maxlength="20000" @bind="e.EditBody"></textarea>
                             </div>
+                            @if (e.Error is not null)
+                            {
+                                <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@e.Error</p>
+                            }
                             <div class="flex gap-2">
-                                <button class="btn btn-primary !min-h-0 py-2" disabled="@string.IsNullOrWhiteSpace(e.EditBody)" @onclick="() => SaveEdit(e)">Save</button>
-                                <button class="btn btn-ghost !min-h-0 py-2" @onclick="() => e.Editing = false">Cancel</button>
+                                <button class="btn btn-primary !min-h-0 py-2" disabled="@(e.Saving || string.IsNullOrWhiteSpace(e.EditBody))" @onclick="() => SaveEdit(e)">
+                                    @(e.Saving ? "Encrypting & saving…" : "Save")
+                                </button>
+                                <button class="btn btn-ghost !min-h-0 py-2" disabled="@e.Saving" @onclick="() => CancelEdit(e)">Cancel</button>
                             </div>
                         </div>
                     }
@@ -150,6 +156,8 @@
         public bool Editing;
         public string EditBody = "";
         public string EditEmotion = "";
+        public bool Saving;
+        public string? Error;
     }
 
     protected override async Task OnInitializedAsync()
@@ -231,19 +239,47 @@
     {
         e.EditBody = e.Body;
         e.EditEmotion = e.Emotion;
+        e.Error = null;
         e.Editing = true;
+    }
+
+    private static void CancelEdit(DecryptedEntry e)
+    {
+        e.Editing = false;
+        e.Error = null;
     }
 
     private async Task SaveEdit(DecryptedEntry e)
     {
-        if (string.IsNullOrWhiteSpace(e.EditBody)) return;
-        var payload = JsonSerializer.Serialize(new { body = e.EditBody, emotion = e.EditEmotion.Trim() });
-        var blob = await Crypto.EncryptAsync(payload);
-        var editedAt = await Store.UpdateEntryAsync(e.Id, blob);
-        e.Body = e.EditBody;
-        e.Emotion = e.EditEmotion.Trim();
+        if (string.IsNullOrWhiteSpace(e.EditBody) || e.Saving) return;
+        e.Error = null;
+
+        // Snapshot before the first await so a mid-save Cancel can't change what
+        // we persist. (Cancel is also disabled while saving.)
+        var body = e.EditBody;
+        var emotion = e.EditEmotion.Trim();
+
+        e.Saving = true;
+        DateTimeOffset editedAt;
+        try
+        {
+            var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { body, emotion }));
+            editedAt = await Store.UpdateEntryAsync(e.Id, blob);
+        }
+        catch
+        {
+            e.Error = "Couldn't save your changes. Check your connection and try again — your words are still here.";
+            return; // stay in edit mode so the error (and the edit) are visible
+        }
+        finally
+        {
+            e.Saving = false;
+        }
+
+        e.Body = body;
+        e.Emotion = emotion;
         e.UpdatedAt = editedAt;
-        e.Tint = Tint(EmotionCatalog.Find(e.Emotion)?.Valence ?? 0);
+        e.Tint = Tint(EmotionCatalog.Find(emotion)?.Valence ?? 0);
         e.Editing = false;
     }
 

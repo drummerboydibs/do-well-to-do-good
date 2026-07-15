@@ -22,6 +22,10 @@ public class TherapyService(AuthService auth)
 
     public record SessionPage(IReadOnlyList<SessionRow> Rows, int Total);
 
+    public record SessionOption(
+        [property: JsonPropertyName("id")] Guid Id,
+        [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);
+
     public record GoalRow(
         [property: JsonPropertyName("id")] Guid Id,
         [property: JsonPropertyName("session_id")] Guid? SessionId,
@@ -58,11 +62,23 @@ public class TherapyService(AuthService auth)
         using var res = await _http.SendAsync(req);
         res.EnsureSuccessStatusCode();
         var rows = await res.Content.ReadFromJsonAsync<List<SessionRow>>() ?? new();
-        var contentRange =
-            (res.Content.Headers.TryGetValues("Content-Range", out var cv) ? cv.FirstOrDefault() : null)
-            ?? (res.Headers.TryGetValues("Content-Range", out var rv) ? rv.FirstOrDefault() : null);
-        var total = Pagination.ParseContentRangeTotal(contentRange) ?? rows.Count;
-        return new SessionPage(rows, total);
+        return new SessionPage(rows, Pagination.TotalFromResponse(res, rows.Count));
+    }
+
+    /// <summary>
+    /// Every session as just (id, created_at) — no payloads, so nothing has to be
+    /// fetched in bulk or decrypted. Enough to populate a "link to a session"
+    /// picker with the complete list regardless of which page the user is viewing.
+    /// The label is necessarily the logged date rather than the session's own
+    /// (encrypted) date; the two line up in practice, for the same reason session
+    /// paging orders by created_at.
+    /// </summary>
+    public async Task<List<SessionOption>> ListSessionOptionsAsync()
+    {
+        using var res = await _http.SendAsync(Req(HttpMethod.Get,
+            "therapy_sessions?select=id,created_at&order=created_at.desc"));
+        res.EnsureSuccessStatusCode();
+        return await res.Content.ReadFromJsonAsync<List<SessionOption>>() ?? new();
     }
 
     /// <summary>

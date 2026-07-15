@@ -10,6 +10,20 @@ namespace DoWellToDoGood.Services;
 public static class Pagination
 {
     /// <summary>
+    /// The grand total from a PostgREST response asked for with "Prefer: count=exact",
+    /// falling back to <paramref name="fallback"/> when the header is missing or
+    /// unparseable. Content-Range is normally a content header, but we tolerate it
+    /// arriving on the response headers.
+    /// </summary>
+    public static int TotalFromResponse(HttpResponseMessage res, int fallback)
+    {
+        var contentRange =
+            (res.Content.Headers.TryGetValues("Content-Range", out var cv) ? cv.FirstOrDefault() : null)
+            ?? (res.Headers.TryGetValues("Content-Range", out var rv) ? rv.FirstOrDefault() : null);
+        return ParseContentRangeTotal(contentRange) ?? fallback;
+    }
+
+    /// <summary>
     /// Pull the total row count out of a PostgREST Content-Range header, which
     /// looks like "0-9/57" (or "*/0" when empty) — we want the part after the
     /// slash. Returns null if it's missing, "*", or otherwise unparseable.

@@ -74,4 +74,35 @@ public class PaginationTests
     {
         Assert.Null(Pagination.ParseContentRangeTotal(header));
     }
+
+    // ---- TotalFromResponse ----
+    // PostgREST returns Content-Range on the content headers. (TotalFromResponse
+    // also checks the response headers, but .NET classifies Content-Range as a
+    // content header and refuses to put it anywhere else, so that fallback can't
+    // be reached through a normal HttpClient — it's inherited belt-and-braces.)
+
+    private static HttpResponseMessage ResponseWith(string? contentRange)
+    {
+        var res = new HttpResponseMessage { Content = new StringContent("[]") };
+        if (contentRange is not null)
+            res.Content.Headers.TryAddWithoutValidation("Content-Range", contentRange);
+        return res;
+    }
+
+    [Fact]
+    public void TotalFromResponse_ReadsContentRangeFromContentHeaders()
+    {
+        using var res = ResponseWith("0-9/57");
+        Assert.Equal(57, Pagination.TotalFromResponse(res, fallback: 10));
+    }
+
+    [Theory]
+    [InlineData(null)]      // header absent entirely
+    [InlineData("0-9/*")]   // total unknown
+    [InlineData("garbage")]
+    public void TotalFromResponse_MissingOrUnparseable_UsesFallback(string? contentRange)
+    {
+        using var res = ResponseWith(contentRange);
+        Assert.Equal(10, Pagination.TotalFromResponse(res, fallback: 10));
+    }
 }

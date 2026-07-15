@@ -94,13 +94,7 @@ public class EntriesService(AuthService auth)
         using var res = await _http.SendAsync(req);
         res.EnsureSuccessStatusCode();
         var rows = await res.Content.ReadFromJsonAsync<List<EntryRow>>() ?? new();
-        // Content-Range is normally a content header, but be tolerant of it
-        // arriving on the response headers; fall back to the page size if absent.
-        var contentRange =
-            (res.Content.Headers.TryGetValues("Content-Range", out var cv) ? cv.FirstOrDefault() : null)
-            ?? (res.Headers.TryGetValues("Content-Range", out var rv) ? rv.FirstOrDefault() : null);
-        var total = Pagination.ParseContentRangeTotal(contentRange) ?? rows.Count;
-        return new EntryPage(rows, total);
+        return new EntryPage(rows, Pagination.TotalFromResponse(res, rows.Count));
     }
 
     public record TimestampRow([property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);
