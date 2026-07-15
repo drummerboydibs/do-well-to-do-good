@@ -70,13 +70,9 @@
             {
                 try
                 {
-                    using var doc = System.Text.Json.JsonDocument.Parse(await Crypto.DecryptAsync(r.Payload));
-                    var title = doc.RootElement.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
-                    DateOnly? legacyEnd = doc.RootElement.TryGetProperty("end", out var e)
-                        && e.ValueKind == System.Text.Json.JsonValueKind.String
-                        && DateOnly.TryParse(e.GetString(), out var d) ? d : null;
-                    var end = r.EndDate ?? legacyEnd;
-                    list.Add(new GoalReminder(title, end, end is { } ed && ed < today));
+                    var goal = GoalPayload.Parse(await Crypto.DecryptAsync(r.Payload));
+                    var end = r.EndDate ?? goal.LegacyEnd;   // prefer the plaintext column; fall back for legacy goals
+                    list.Add(new GoalReminder(goal.Title, end, end is { } ed && ed < today));
                 }
                 catch { /* skip a goal that won't decrypt */ }
             }

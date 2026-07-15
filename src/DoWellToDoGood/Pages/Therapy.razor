@@ -1,5 +1,4 @@
 @page "/therapy"
-@using System.Text.Json
 @using DoWellToDoGood.Services
 @inject AuthService Auth
 @inject CryptoService Crypto
@@ -321,6 +320,9 @@
     private bool _loading = true;
     private readonly string _today = DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
 
+    // What a payload with no usable date falls back to.
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
+
     // Log-session form
     private DateOnly _sessionDate = DateOnly.FromDateTime(DateTime.Today);
     private string _sessionNotes = "";
@@ -506,17 +508,13 @@
         _savingSession = true;
         try
         {
-            var sessionPayload = JsonSerializer.Serialize(new
-            {
-                date = _sessionDate.ToString("yyyy-MM-dd"),
-                notes = _sessionNotes
-            });
+            var sessionPayload = TherapySessionPayload.Serialize(new TherapySession(_sessionDate, _sessionNotes));
             var blob = await Crypto.EncryptAsync(sessionPayload);
             var sessionId = await Svc.InsertSessionAsync(blob);
 
             foreach (var d in _goalDrafts.Where(d => !string.IsNullOrWhiteSpace(d.Title)))
             {
-                var gblob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { title = d.Title.Trim() }));
+                var gblob = await Crypto.EncryptAsync(GoalPayload.Serialize(d.Title.Trim()));
                 await Svc.InsertGoalAsync(sessionId, gblob, d.End);
             }
         }
@@ -572,7 +570,7 @@
         _savingGoal = true;
         try
         {
-            var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { title }));
+            var blob = await Crypto.EncryptAsync(GoalPayload.Serialize(title));
             await Svc.InsertGoalAsync(sessionId, blob, end);
         }
         catch
@@ -613,7 +611,7 @@
     private async Task SaveEdit(GoalVm g)
     {
         if (string.IsNullOrWhiteSpace(g.EditTitle)) return;
-        var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { title = g.EditTitle.Trim() }));
+        var blob = await Crypto.EncryptAsync(GoalPayload.Serialize(g.EditTitle.Trim()));
         await Svc.UpdateGoalAsync(g.Id, blob, g.EditEnd);
         g.Title = g.EditTitle.Trim();
         g.End = g.EditEnd;
@@ -642,11 +640,7 @@
     private async Task AddProgress(GoalVm g)
     {
         if (string.IsNullOrWhiteSpace(g.DraftNote)) return;
-        var payload = JsonSerializer.Serialize(new
-        {
-            date = g.DraftDate.ToString("yyyy-MM-dd"),
-            note = g.DraftNote.Trim()
-        });
+        var payload = GoalProgressPayload.Serialize(new GoalProgressNote(g.DraftDate, g.DraftNote.Trim()));
         var blob = await Crypto.EncryptAsync(payload);
         await Svc.InsertProgressAsync(g.Id, blob);
         // Optimistic: show it immediately (server timestamp ~ now).
@@ -699,11 +693,7 @@
         DateTimeOffset editedAt;
         try
         {
-            var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new
-            {
-                date = date.ToString("yyyy-MM-dd"),
-                notes
-            }));
+            var blob = await Crypto.EncryptAsync(TherapySessionPayload.Serialize(new TherapySession(date, notes)));
             editedAt = await Svc.UpdateSessionAsync(s.Id, blob);
         }
         catch
@@ -741,11 +731,8 @@
     {
         try
         {
-            using var doc = JsonDocument.Parse(await Crypto.DecryptAsync(payload));
-            var title = doc.RootElement.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
-            DateOnly? end = doc.RootElement.TryGetProperty("end", out var e) && e.ValueKind == JsonValueKind.String
-                && DateOnly.TryParse(e.GetString(), out var d) ? d : null;
-            return (title, end);
+            var goal = GoalPayload.Parse(await Crypto.DecryptAsync(payload));
+            return (goal.Title, goal.LegacyEnd);
         }
         catch { return ("⚠ Couldn't decrypt this goal", null); }
     }
@@ -754,25 +741,19 @@
     {
         try
         {
-            using var doc = JsonDocument.Parse(await Crypto.DecryptAsync(payload));
-            var note = doc.RootElement.TryGetProperty("note", out var n) ? n.GetString() ?? "" : "";
-            var date = doc.RootElement.TryGetProperty("date", out var dt) && DateOnly.TryParse(dt.GetString(), out var d)
-                ? d : DateOnly.FromDateTime(DateTime.Today);
-            return (note, date);
+            var progress = GoalProgressPayload.Parse(await Crypto.DecryptAsync(payload), Today);
+            return (progress.Note, progress.Date);
         }
-        catch { return ("⚠ Couldn't decrypt this note", DateOnly.FromDateTime(DateTime.Today)); }
+        catch { return ("⚠ Couldn't decrypt this note", Today); }
     }
 
     private async Task<(DateOnly Date, string Notes, bool Ok)> DecryptSession(string payload)
     {
         try
         {
-            using var doc = JsonDocument.Parse(await Crypto.DecryptAsync(payload));
-            var date = doc.RootElement.TryGetProperty("date", out var dt) && DateOnly.TryParse(dt.GetString(), out var d)
-                ? d : DateOnly.FromDateTime(DateTime.Today);
-            var notes = doc.RootElement.TryGetProperty("notes", out var n) ? n.GetString() ?? "" : "";
-            return (date, notes, true);
+            var session = TherapySessionPayload.Parse(await Crypto.DecryptAsync(payload), Today);
+            return (session.Date, session.Notes, true);
         }
-        catch { return (DateOnly.FromDateTime(DateTime.Today), "⚠ Couldn't decrypt this session", false); }
+        catch { return (Today, "⚠ Couldn't decrypt this session", false); }
     }
 }
