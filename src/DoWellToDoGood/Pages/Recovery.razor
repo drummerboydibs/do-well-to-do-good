@@ -1,5 +1,4 @@
 @page "/recovery"
-@using System.Text.Json
 @using DoWellToDoGood.Models
 @using DoWellToDoGood.Services
 @inject AuthService Auth
@@ -220,16 +219,15 @@
     {
         try
         {
-            using var doc = JsonDocument.Parse(await Crypto.DecryptAsync(r.Payload));
-            var e = doc.RootElement;
+            var c = SobrietyCounterPayload.Parse(await Crypto.DecryptAsync(r.Payload), Today);
             return new CounterVm
             {
                 Id = r.Id,
-                Name = e.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "",
-                CleanSince = e.TryGetProperty("cleanSince", out var cs) && DateOnly.TryParse(cs.GetString(), out var d) ? d : Today,
-                BestStreakDays = e.TryGetProperty("best", out var b) && b.TryGetInt32(out var bi) ? bi : 0,
-                LastRunDays = e.TryGetProperty("last", out var l) && l.TryGetInt32(out var li) ? li : 0,
-                ResetCount = e.TryGetProperty("resets", out var rc) && rc.TryGetInt32(out var ri) ? ri : 0,
+                Name = c.Name,
+                CleanSince = c.CleanSince,
+                BestStreakDays = c.BestStreakDays,
+                LastRunDays = c.LastRunDays,
+                ResetCount = c.ResetCount,
             };
         }
         catch
@@ -239,14 +237,7 @@
     }
 
     private static string Payload(string name, DateOnly cleanSince, int best, int last, int resets) =>
-        JsonSerializer.Serialize(new
-        {
-            name,
-            cleanSince = cleanSince.ToString("yyyy-MM-dd"),
-            best,
-            last,
-            resets
-        });
+        SobrietyCounterPayload.Serialize(new SobrietyCounter(name, cleanSince, best, last, resets));
 
     private static int Days(CounterVm c) => Milestones.DaysClean(c.CleanSince, Today);
     private static int Best(CounterVm c) => Math.Max(c.BestStreakDays, Days(c));
