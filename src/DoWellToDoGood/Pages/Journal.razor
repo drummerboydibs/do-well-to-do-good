@@ -1,5 +1,4 @@
 @page "/journal"
-@using System.Text.Json
 @using DoWellToDoGood.Models
 @using DoWellToDoGood.Services
 @inject AuthService Auth
@@ -287,7 +286,7 @@
         try
         {
             // Encrypt body + emotion together; the server only ever sees ciphertext.
-            var payload = JsonSerializer.Serialize(new { body = _body, emotion = _emotion.Trim() });
+            var payload = JournalEntryPayload.Serialize(new JournalEntry(_body, _emotion.Trim()));
             var blob = await Crypto.EncryptAsync(payload);
             await Entries.InsertEntryAsync(blob);
         }

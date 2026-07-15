@@ -1,5 +1,4 @@
 @page "/entries"
-@using System.Text.Json
 @using DoWellToDoGood.Services
 @inject AuthService Auth
 @inject CryptoService Crypto
@@ -210,10 +209,9 @@
             bool ok = true;
             try
             {
-                var json = await Crypto.DecryptAsync(row.Payload);
-                using var doc = JsonDocument.Parse(json);
-                body = doc.RootElement.GetProperty("body").GetString() ?? "";
-                emotion = doc.RootElement.TryGetProperty("emotion", out var em) ? em.GetString() ?? "" : "";
+                var entry = JournalEntryPayload.Parse(await Crypto.DecryptAsync(row.Payload));
+                body = entry.Body;
+                emotion = entry.Emotion;
             }
             catch
             {
@@ -263,7 +261,7 @@
         DateTimeOffset editedAt;
         try
         {
-            var blob = await Crypto.EncryptAsync(JsonSerializer.Serialize(new { body, emotion }));
+            var blob = await Crypto.EncryptAsync(JournalEntryPayload.Serialize(new JournalEntry(body, emotion)));
             editedAt = await Store.UpdateEntryAsync(e.Id, blob);
         }
         catch
