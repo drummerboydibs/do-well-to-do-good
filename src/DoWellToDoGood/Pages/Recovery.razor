@@ -9,13 +9,14 @@
 <PageTitle>Recovery — Do Well to Do Good</PageTitle>
 
 <div class="mx-auto max-w-3xl px-6 space-y-6">
-    <div class="space-y-1">
-        <h1>Recovery</h1>
-        <p class="text-muted m-0">
-            Count the time you're free from anything you're working to leave behind. Everything here —
-            the name, the date, the day count — is encrypted, so only you can ever see it.
-        </p>
-    </div>
+    <PageHeader Title="Recovery" Subtitle="Count the time you're free from what you're leaving behind." Encrypted="Auth.IsSignedIn">
+        <Actions>
+            @if (Auth.IsSignedIn && Crypto.IsUnlocked && !_loading && _counters.Count > 0 && !_showAdd)
+            {
+                <button type="button" class="btn" @onclick="OpenAdd">+ Add a counter</button>
+            }
+        </Actions>
+    </PageHeader>
 
     @if (!Auth.IsSignedIn)
     {
@@ -36,9 +37,43 @@
     {
         @if (_counters.Count == 0)
         {
-            <div class="card-soft text-muted">
-                No counters yet. Add your first one below — start from today, or backdate it to when your streak really began.
-            </div>
+            <EmptyState Message="No counters yet. Add your first one below — start from today, or backdate it to when your streak really began." />
+        }
+
+        @* ---------- Add a counter (always open when there are none yet) ---------- *@
+        @if (_counters.Count == 0 || _showAdd)
+        {
+            <section class="card space-y-4" aria-labelledby="add-h">
+                <h2 id="add-h" class="m-0 text-base font-bold">Add a counter</h2>
+                <div class="field m-0">
+                    <label class="label" for="new-label">What are you leaving behind?</label>
+                    <input id="new-label" @ref="_newLabelEl" class="input" type="text" maxlength="80" list="addiction-suggestions"
+                           placeholder="e.g. Alcohol" @bind="_newLabel" />
+                    <datalist id="addiction-suggestions">
+                        <option value="Alcohol" />
+                        <option value="Nicotine" />
+                        <option value="Gambling" />
+                        <option value="Drugs" />
+                        <option value="Sugar" />
+                        <option value="Other" />
+                    </datalist>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <label class="text-sm text-muted" for="new-date">Clean since</label>
+                    <input id="new-date" class="input w-auto" type="date" max="@_today" @bind="_newDate" />
+                </div>
+                @if (_addError is not null)
+                {
+                    <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_addError</p>
+                }
+                <div class="flex gap-2 flex-wrap">
+                    <button class="btn btn-primary" disabled="@_adding" @onclick="AddCounter">@(_adding ? "Adding…" : "Add counter")</button>
+                    @if (_counters.Count > 0)
+                    {
+                        <button class="btn btn-ghost" disabled="@_adding" @onclick="CloseAdd">Cancel</button>
+                    }
+                </div>
+            </section>
         }
 
         @foreach (var c in _counters)
@@ -52,16 +87,16 @@
                     </div>
                     <div class="flex items-center gap-2 flex-wrap">
                         <label class="text-sm text-muted" for="edit-date-@c.Id">Clean since</label>
-                        <input id="edit-date-@c.Id" class="input !min-h-0 py-1 w-auto" type="date" max="@_today" @bind="c.EditDate" />
+                        <input id="edit-date-@c.Id" class="input w-auto" type="date" max="@_today" @bind="c.EditDate" />
                     </div>
                     <div class="flex gap-2">
-                        <button class="btn btn-primary !min-h-0 py-2" @onclick="() => SaveEdit(c)">Save</button>
-                        <button class="btn btn-ghost !min-h-0 py-2" @onclick="() => c.Editing = false">Cancel</button>
+                        <button class="btn btn-primary btn-sm" @onclick="() => SaveEdit(c)">Save</button>
+                        <button class="btn btn-ghost btn-sm" @onclick="() => c.Editing = false">Cancel</button>
                     </div>
                 }
                 else
                 {
-                    <header class="flex justify-between items-start gap-3 flex-wrap">
+                    <header class="flex justify-between items-start gap-2">
                         <div class="min-w-0">
                             <h2 class="m-0 text-lg font-bold">@c.Name</h2>
                             <p class="m-0 mt-1">
@@ -70,11 +105,7 @@
                             </p>
                             <p class="text-xs text-muted m-0">since @c.CleanSince.ToString("MMM d, yyyy")</p>
                         </div>
-                        <div class="flex gap-2 flex-wrap">
-                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => StartEdit(c)">Edit</button>
-                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => StartReset(c)">I had a setback</button>
-                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteCounter(c)">Delete</button>
-                        </div>
+                        <ActionMenu Label="@($"Actions for {c.Name}")" Actions="CounterActions(c)" />
                     </header>
 
                     @if (Milestones.IsMilestone(Days(c)))
@@ -104,11 +135,11 @@
                             <p class="m-0 font-semibold">A setback is part of recovery, not the end of it. Let's start fresh — your progress so far is kept.</p>
                             <div class="flex items-center gap-2 flex-wrap">
                                 <label class="text-sm text-muted" for="reset-date-@c.Id">Clean again since</label>
-                                <input id="reset-date-@c.Id" class="input !min-h-0 py-1 w-auto" type="date" max="@_today" @bind="c.ResetDate" />
+                                <input id="reset-date-@c.Id" class="input w-auto" type="date" max="@_today" @bind="c.ResetDate" />
                             </div>
                             <div class="flex gap-2">
-                                <button class="btn btn-primary !min-h-0 py-2" @onclick="() => ConfirmReset(c)">Start fresh</button>
-                                <button class="btn btn-ghost !min-h-0 py-2" @onclick="() => c.Resetting = false">Cancel</button>
+                                <button class="btn btn-primary btn-sm" @onclick="() => ConfirmReset(c)">Start fresh</button>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => c.Resetting = false">Cancel</button>
                             </div>
                         </div>
                     }
@@ -127,37 +158,11 @@
             </article>
         }
 
-        @* ---------- Add a counter ---------- *@
-        <section class="card space-y-4" aria-labelledby="add-h">
-            <h2 id="add-h" class="m-0 text-base font-bold">Add a counter</h2>
-            <div class="field m-0">
-                <label class="label" for="new-label">What are you leaving behind?</label>
-                <input id="new-label" class="input" type="text" maxlength="80" list="addiction-suggestions"
-                       placeholder="e.g. Alcohol" @bind="_newLabel" />
-                <datalist id="addiction-suggestions">
-                    <option value="Alcohol" />
-                    <option value="Nicotine" />
-                    <option value="Gambling" />
-                    <option value="Drugs" />
-                    <option value="Sugar" />
-                    <option value="Other" />
-                </datalist>
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-                <label class="text-sm text-muted" for="new-date">Clean since</label>
-                <input id="new-date" class="input !min-h-0 py-1 w-auto" type="date" max="@_today" @bind="_newDate" />
-            </div>
-            @if (_addError is not null)
-            {
-                <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_addError</p>
-            }
-            <button class="btn btn-primary" disabled="@_adding" @onclick="AddCounter">@(_adding ? "Adding…" : "Add counter")</button>
-        </section>
 
         @* ---------- Resources callout ---------- *@
         <div class="card-soft flex items-center justify-between gap-3 flex-wrap">
             <p class="m-0 text-muted">Need support right now? You don't have to do this alone.</p>
-            <a class="btn !min-h-0 py-2" href="resources">Recovery resources →</a>
+            <a class="btn btn-sm" href="resources">Recovery resources →</a>
         </div>
     }
 </div>
@@ -172,6 +177,7 @@
     private string _newLabel = "";
     private DateOnly _newDate = Today;
     private bool _adding;
+    private bool _showAdd;
     private string? _addError;
 
     private sealed class CounterVm
@@ -255,6 +261,7 @@
             await Svc.InsertCounterAsync(blob);
             _newLabel = "";
             _newDate = Today;
+            _showAdd = false;
             await Load();
         }
         catch
@@ -265,6 +272,37 @@
         {
             _adding = false;
         }
+    }
+
+    private List<MenuAction> CounterActions(CounterVm c) => new()
+    {
+        new("Edit", () => StartEdit(c)),
+        new("I had a setback", () => StartReset(c)),
+        new("Delete", () => DeleteCounter(c), Danger: true),
+    };
+
+    private ElementReference _newLabelEl;
+    private bool _focusAdd;
+
+    private void OpenAdd()
+    {
+        _showAdd = true;
+        _focusAdd = true; // land in the name field once the form renders
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusAdd)
+        {
+            _focusAdd = false;
+            try { await _newLabelEl.FocusAsync(); } catch { }
+        }
+    }
+
+    private void CloseAdd()
+    {
+        _showAdd = false;
+        _addError = null;
     }
 
     private void StartEdit(CounterVm c)

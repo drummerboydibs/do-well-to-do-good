@@ -1,0 +1,50 @@
+@* A modal bottom sheet — the one implementation behind the mobile "More" nav
+   and every row action menu. It owns the scrim, dialog semantics, Escape to
+   close, and pulling focus in on open. Returning focus on close is the
+   opener's job, since only the opener holds a reference to its trigger. *@
+
+@if (Open)
+{
+    <div class="sheet-scrim @Class" @onclick="Close"></div>
+    <div class="sheet @Class" role="dialog" aria-modal="true" aria-label="@Label"
+         tabindex="-1" @ref="_el" @onkeydown="HandleKeydown">
+        <div class="sheet-grip" aria-hidden="true"></div>
+        @if (Title is not null)
+        {
+            <p class="sheet-title">@Title</p>
+        }
+        @ChildContent
+    </div>
+}
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>Accessible name for the dialog.</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    /// <summary>Optional visible heading shown under the grip.</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Extra classes for the scrim and sheet (e.g. <c>sm:hidden</c>).</summary>
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private ElementReference _el;
+    private bool _wasOpen;
+
+    private Task Close() => OnClose.InvokeAsync();
+
+    private Task HandleKeydown(KeyboardEventArgs e) => e.Key is "Escape" ? Close() : Task.CompletedTask;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Open && !_wasOpen)
+        {
+            try { await _el.FocusAsync(); } catch { /* hidden at this breakpoint */ }
+        }
+        _wasOpen = Open;
+    }
+}

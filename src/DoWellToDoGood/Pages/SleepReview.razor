@@ -9,13 +9,11 @@
 <PageTitle>Sleep review — Do Well to Do Good</PageTitle>
 
 <div class="mx-auto max-w-3xl px-6 space-y-6">
-    <div class="flex items-center justify-between gap-3 flex-wrap">
-        <div class="space-y-1 min-w-0">
-            <h1 class="m-0">Sleep at a glance</h1>
-            <p class="text-muted m-0">Your own patterns, worked out in your browser — nothing here ever leaves it unencrypted.</p>
-        </div>
-        <a class="btn" href="sleep">← Log</a>
-    </div>
+    <PageHeader Title="Sleep at a glance" Subtitle="Your own patterns, worked out in your browser." Encrypted="Auth.IsSignedIn">
+        <Actions>
+            <a class="btn" href="sleep">← Log</a>
+        </Actions>
+    </PageHeader>
 
     @if (!Auth.IsSignedIn)
     {
@@ -37,9 +35,9 @@
         @* ================= Week at a glance ================= *@
         <section class="card space-y-4" aria-labelledby="week-h">
             <div class="flex items-center justify-between gap-2">
-                <button class="btn btn-ghost !min-h-0 !py-1 !px-2" @onclick="() => ShiftWeek(-1)" aria-label="Previous week">←</button>
+                <button class="btn btn-ghost btn-sm" @onclick="() => ShiftWeek(-1)" aria-label="Previous week">←</button>
                 <h2 id="week-h" class="m-0 text-base font-bold text-center">@WeekLabel</h2>
-                <button class="btn btn-ghost !min-h-0 !py-1 !px-2" disabled="@_weekAtToday" @onclick="() => ShiftWeek(1)" aria-label="Next week">→</button>
+                <button class="btn btn-ghost btn-sm" disabled="@_weekAtToday" @onclick="() => ShiftWeek(1)" aria-label="Next week">→</button>
             </div>
 
             <div class="flex items-end justify-between gap-1.5" style="height:160px" role="img" aria-label="@WeekAria">
@@ -69,9 +67,9 @@
         @* ================= Month at a glance ================= *@
         <section class="card space-y-4" aria-labelledby="month-h">
             <div class="flex items-center justify-between gap-2">
-                <button class="btn btn-ghost !min-h-0 !py-1 !px-2" @onclick="() => ShiftMonth(-1)" aria-label="Previous month">←</button>
+                <button class="btn btn-ghost btn-sm" @onclick="() => ShiftMonth(-1)" aria-label="Previous month">←</button>
                 <h2 id="month-h" class="m-0 text-base font-bold text-center">@_monthAnchor.ToString("MMMM yyyy", CultureInfo.CurrentCulture)</h2>
-                <button class="btn btn-ghost !min-h-0 !py-1 !px-2" disabled="@_monthAtToday" @onclick="() => ShiftMonth(1)" aria-label="Next month">→</button>
+                <button class="btn btn-ghost btn-sm" disabled="@_monthAtToday" @onclick="() => ShiftMonth(1)" aria-label="Next month">→</button>
             </div>
 
             <div class="grid grid-cols-7 gap-1.5 text-center">

@@ -1,0 +1,18 @@
+@* A gentle "nothing here yet" card that says what to do next. *@
+<div class="card-soft text-center space-y-4">
+    <p class="text-muted m-0">@Message</p>
+    @if (ActionText is not null && ActionHref is not null)
+    {
+        <a class="btn btn-primary" href="@ActionHref">@ActionText</a>
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Message { get; set; } = "";
+    [Parameter] public string? ActionText { get; set; }
+    [Parameter] public string? ActionHref { get; set; }
+
+    /// <summary>Optional custom action (e.g. a button with a handler) instead of a link.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -27,12 +27,7 @@
     </button>
 </nav>
 
-@if (_sheetOpen)
-{
-    <div class="sheet-scrim sm:hidden" @onclick="CloseSheet"></div>
-    <div class="sheet sm:hidden" role="dialog" aria-modal="true" aria-label="More navigation"
-         tabindex="-1" @ref="_sheetEl" @onkeydown="HandleSheetKeydown">
-        <div class="sheet-grip" aria-hidden="true"></div>
+<Sheet Open="_sheetOpen" OnClose="CloseSheet" Label="More navigation" Class="sm:hidden">
         <div class="grid grid-cols-3 gap-2 pt-1">
             @foreach (var item in _overflow)
             {
@@ -46,14 +41,12 @@
                 <span>@(Auth.IsSignedIn ? "Account" : "Sign in")</span>
             </NavLink>
         </div>
-    </div>
-}
+</Sheet>
 
 @code {
     private bool _sheetOpen;
     private ElementReference _moreBtn;   // focus returns here when the sheet closes
-    private ElementReference _sheetEl;   // focus moves here when the sheet opens
-    private bool _focusSheet, _restoreFocus;
+    private bool _restoreFocus;
     private IReadOnlyList<NavItem> _visible = Array.Empty<NavItem>();
 
     /// <summary>"page" for the active route (so screen readers announce it), else null (attribute omitted).</summary>
@@ -88,11 +81,7 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
-    private void ToggleSheet()
-    {
-        _sheetOpen = !_sheetOpen;
-        if (_sheetOpen) _focusSheet = true; // pull focus into the dialog once it renders
-    }
+    private void ToggleSheet() => _sheetOpen = !_sheetOpen; // Sheet pulls focus in when it opens
 
     private void CloseSheet()
     {
@@ -101,19 +90,9 @@
         _restoreFocus = true; // hand focus back to the button that opened it
     }
 
-    private void HandleSheetKeydown(KeyboardEventArgs e)
-    {
-        if (e.Key is "Escape") CloseSheet();
-    }
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_focusSheet)
-        {
-            _focusSheet = false;
-            try { await _sheetEl.FocusAsync(); } catch { /* not in DOM (desktop) */ }
-        }
-        else if (_restoreFocus)
+        if (_restoreFocus)
         {
             _restoreFocus = false;
             try { await _moreBtn.FocusAsync(); } catch { }
