@@ -4,19 +4,12 @@
 @inject CryptoService Crypto
 @inject TherapyService Therapy
 
-@* A gentle reminder of the user's open therapy goals. Renders nothing when
-   signed out or when there are no open goals. Shared by Home and the Journal
-   page so both stay in sync. *@
-@if (Auth.IsSignedIn)
+@* A gentle reminder of the user's open therapy goals, for Home. Renders
+   nothing when signed out, locked (Home's single UnlockCard covers that), or
+   when there are no open goals. *@
+@if (Auth.IsSignedIn && Crypto.IsUnlocked)
 {
-    @if (!Crypto.IsUnlocked)
-    {
-        <div class="card-soft flex items-center justify-between gap-3 flex-wrap mb-6">
-            <p class="m-0 text-muted">Unlock to see your therapy goals for the week.</p>
-            <a class="btn !min-h-0 py-2" href="therapy">Unlock &amp; view →</a>
-        </div>
-    }
-    else if (_goals.Count > 0)
+    @if (_goals.Count > 0)
     {
         <div class="card space-y-3 mb-6">
             <div class="flex items-center justify-between gap-2 flex-wrap">

@@ -1,0 +1,31 @@
+@* Consistent page header: title, an optional one-line subtitle, the
+   encryption badge for private pages, and an optional actions slot that sits
+   to the right on wide screens and wraps under the title on phones. *@
+
+<div class="flex items-start justify-between gap-3 flex-wrap">
+    <div class="space-y-2 min-w-0">
+        <h1 class="m-0">@Title</h1>
+        @if (Subtitle is not null)
+        {
+            <p class="text-muted m-0">@Subtitle</p>
+        }
+        @if (Encrypted)
+        {
+            <EncryptedBadge />
+        }
+    </div>
+    @if (Actions is not null)
+    {
+        <div class="flex items-center gap-2 flex-wrap">@Actions</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Subtitle { get; set; }
+
+    /// <summary>Show the "only you can read this" badge.</summary>
+    [Parameter] public bool Encrypted { get; set; }
+
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

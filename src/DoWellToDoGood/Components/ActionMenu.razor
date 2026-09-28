@@ -1,0 +1,59 @@
+@* A row's secondary actions behind one ⋯ button, opening a bottom sheet.
+   Replaces rows of small inline Edit / Delete / … buttons. *@
+
+<button type="button" class="kebab" @ref="_trigger" aria-label="@Label"
+        aria-haspopup="dialog" aria-expanded="@(_open ? "true" : "false")"
+        @onclick="() => _open = true">
+    <NavIcon Name="more" Size="22" />
+</button>
+
+<Sheet Open="_open" OnClose="Close" Label="@Label" Title="@Title">
+    <ul class="list-none m-0 p-0 space-y-1">
+        @foreach (var a in Actions)
+        {
+            <li>
+                <button type="button" class="sheet-action @(a.Danger ? "is-danger" : "")" @onclick="() => Choose(a)">
+                    @a.Text
+                </button>
+            </li>
+        }
+    </ul>
+</Sheet>
+
+@code {
+    /// <summary>Accessible name naming the row, e.g. "Actions for entry from Mar 3".</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    /// <summary>Optional visible heading in the sheet (defaults to none).</summary>
+    [Parameter] public string? Title { get; set; }
+
+    [Parameter, EditorRequired] public IReadOnlyList<MenuAction> Actions { get; set; } = Array.Empty<MenuAction>();
+
+    private bool _open, _restoreFocus;
+    private ElementReference _trigger;
+
+    private void Close()
+    {
+        _open = false;
+        _restoreFocus = true;
+    }
+
+    // Close first, then run: delete actions raise a native confirm(), which
+    // shouldn't sit on top of an open sheet.
+    private async Task Choose(MenuAction a)
+    {
+        Close();
+        StateHasChanged();
+        await Task.Yield();
+        await a.Run();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_restoreFocus)
+        {
+            _restoreFocus = false;
+            try { await _trigger.FocusAsync(); } catch { /* row may be gone (deleted) */ }
+        }
+    }
+}
