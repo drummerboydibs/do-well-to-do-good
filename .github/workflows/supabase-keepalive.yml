@@ -1,0 +1,34 @@
+name: Supabase keep-alive
+
+# Free-tier Supabase projects pause after 7 days without database activity.
+# Run a tiny read twice a week so there are never more than ~4 days between
+# queries, leaving slack for late or failed scheduled runs.
+on:
+  schedule:
+    - cron: "17 14 * * 1,4" # Mon + Thu, 14:17 UTC (off the hour to avoid queue delays)
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      # Same public values as src/DoWellToDoGood/Services/SupabaseConfig.cs.
+      # The publishable key is safe to expose: RLS means this anonymous read
+      # returns an empty list, but it still runs a real Postgres query, which
+      # is what counts as activity.
+      - name: Query the database
+        env:
+          SUPABASE_URL: https://vorzyrvkvdvkktdcwahl.supabase.co
+          SUPABASE_KEY: sb_publishable__XsvlnDT0Me6O1zNkr_dAQ_FMgowiZJ
+        run: |
+          status=$(curl -sS -o response.json -w "%{http_code}" \
+            --retry 3 --retry-delay 10 \
+            "$SUPABASE_URL/rest/v1/journal_entries?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY")
+          echo "HTTP $status"
+          cat response.json; echo
+          # Fail loudly (GitHub emails on failed scheduled runs) if the project
+          # is already paused or the query errored.
+          test "$status" = "200"
