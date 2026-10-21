@@ -1,40 +1,54 @@
 @page "/"
+@using System.Globalization
 @using DoWellToDoGood.Services
 @implements IDisposable
 @inject AuthService Auth
+@inject NavPrefsService NavPrefs
 
 <PageTitle>Do Well to Do Good — private mental wellness journaling</PageTitle>
 
 <div class="overflow-x-clip">
 
-    @* ===================== Hero ===================== *@
     @if (Auth.IsSignedIn)
     {
-        <section class="mx-auto max-w-3xl px-6 pt-4 pb-6 text-center space-y-5">
-            <img src="icons/icon.svg" alt="" class="mx-auto w-24 h-24 drop-shadow" width="96" height="96" />
-            <h1 class="brand-word leading-tight">Welcome back</h1>
-            <p class="text-xl text-muted max-w-2xl mx-auto">
-                Your calm place is ready whenever you are, so you can get back to making the world a better place.
+        @* ===================== Today (signed in) =====================
+           Your day at a glance: one action, then a card per tracker you use
+           (in your order), your journey so far, and a thought for the day. *@
+        <div class="mx-auto max-w-3xl px-6">
+            <section class="pb-6 space-y-4">
+                <div class="space-y-1">
+                    <h1 class="m-0">Today</h1>
+                    <p class="text-muted m-0">@DateTime.Now.ToString("dddd, MMMM d", CultureInfo.CurrentCulture)</p>
+                </div>
+                <a class="btn btn-primary btn-block" href="journal/new">
+                    <NavIcon Name="pencil" Size="20" /> Start writing
+                </a>
+            </section>
+
+            <UnlockCard />
+            <OnboardingCard />
+
+            @foreach (var tracker in NavPrefs.VisibleItems(signedIn: true))
+            {
+                @switch (tracker.Key)
+                {
+                    case "sleep": <LastNightCard @key="tracker.Key" /> break;
+                    case "recovery": <SobrietyCounters @key="tracker.Key" ShowEmpty="true" /> break;
+                    case "therapy": <OpenGoalsReminder @key="tracker.Key" ShowEmpty="true" /> break;
+                }
+            }
+
+            <JourneyStats />
+            <DailyThought />
+
+            <p class="text-center text-sm m-0">
+                <a class="font-semibold" href="account?trackers=1">Choose what you track →</a>
             </p>
-
-            <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <a class="btn btn-primary btn-lg" href="journal">Start writing</a>
-                <a class="btn btn-lg" href="entries">My journal</a>
-            </div>
-
-            <div class="pt-3">
-                <a class="btn btn-ghost" href="signin">Account &amp; settings →</a>
-            </div>
-        </section>
-
-        <section class="mx-auto max-w-3xl px-6 pb-2">
-            <SobrietyCounters />
-            <OpenGoalsReminder />
-            <FaithPassageOfDay />
-        </section>
+        </div>
     }
     else
     {
+        @* ===================== Landing (guests) ===================== *@
         <section class="mx-auto max-w-3xl px-6 pt-4 pb-6 text-center space-y-5">
             <img src="icons/icon.svg" alt="" class="mx-auto w-24 h-24 drop-shadow" width="96" height="96" />
             <h1 class="brand-word leading-tight">do <span class="brand-well">well</span> to do <span class="brand-good">good</span></h1>
@@ -44,146 +58,157 @@
             <p class="font-semibold" style="color:var(--color-primary-hover)">Designed from the ground up for privacy.</p>
 
             <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <a class="btn btn-primary btn-lg" href="signin">Create your free account</a>
-                <a class="btn btn-lg" href="signin">Sign in</a>
+                <a class="btn btn-primary btn-lg" href="account">Create your free account</a>
+                <a class="btn btn-lg" href="account">Sign in</a>
             </div>
 
             <div class="pt-3">
-                <a class="btn btn-ghost" href="journal">Continue as a guest →</a>
+                <a class="btn btn-ghost" href="journal/new">Continue as a guest →</a>
                 <p class="text-muted text-sm mt-2 max-w-md mx-auto">
                     Nothing you write is saved anywhere — just shout into the wind to give your thoughts a voice.
                 </p>
             </div>
         </section>
-    }
 
-    <section class="mx-auto max-w-3xl px-6 pb-2">
-        <DefinitionOfDay />
-    </section>
+        <section class="mx-auto max-w-3xl px-6 pb-2">
+            <DailyThought />
+        </section>
 
-    @* ===================== Explore — jump to any part of the app ===================== *@
-    <section class="shell py-8">
-        <h2 class="text-center mb-2">Explore</h2>
-        <p class="text-muted text-center mb-8 max-w-2xl mx-auto">
-            Every part of your calm place — jump straight in, or scroll to see what's here.
-        </p>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            @foreach (var item in ExploreItems)
-            {
-                var locked = item.RequiresAuth && !Auth.IsSignedIn;
-                <a class="card no-underline flex gap-4 items-start transition hover:-translate-y-1"
-                   style="color:var(--color-ink)" href="@(locked ? "signin" : item.Href)">
-                    <span class="inline-flex items-center justify-center w-12 h-12 rounded-full shrink-0"
-                          style="color:var(--color-primary); background:var(--color-primary-soft)" aria-hidden="true">
-                        <NavIcon Name="@item.Icon" Size="24" />
-                    </span>
-                    <div class="min-w-0">
-                        <h3 class="mb-1">@item.Label</h3>
-                        <p class="text-muted m-0">@item.Blurb</p>
-                        @if (locked)
-                        {
-                            <p class="text-sm font-semibold mt-2 m-0" style="color:var(--color-primary-hover)">Sign in to unlock →</p>
-                        }
-                    </div>
-                </a>
-            }
-        </div>
-    </section>
-
-    @* ===================== Features ===================== *@
-    <section class="shell py-8">
-        <h2 class="text-center mb-8">A calm place to come back to yourself</h2>
-        <div class="grid sm:grid-cols-2 gap-5">
-
-            <article class="card flex gap-4 items-start">
-                <span class="inline-flex items-center justify-center w-12 h-12 rounded-full shrink-0"
-                      style="color:var(--color-brand-blue); background:var(--color-emo-sad-soft)" aria-hidden="true">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 20h4L19 9a2.5 2.5 0 0 0-3.5-3.5L4 16.5V20z" /><path d="M14 6.5l3.5 3.5" />
-                    </svg>
-                </span>
-                <div>
-                    <h3>Let it out</h3>
-                    <p class="text-muted m-0">Write out what’s on your mind and how you feel. Save it, or “shout into the wind” and let it go without a trace.</p>
-                </div>
-            </article>
-
-            <article class="card flex gap-4 items-start">
-                <span class="inline-flex items-center justify-center w-12 h-12 rounded-full shrink-0"
-                      style="color:#b5832f; background:var(--color-emo-happy-soft)" aria-hidden="true">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="9" /><path d="M8.5 14.5a4 4 0 0 0 7 0" />
-                        <circle cx="9" cy="9.8" r=".9" fill="currentColor" stroke="none" /><circle cx="15" cy="9.8" r=".9" fill="currentColor" stroke="none" />
-                    </svg>
-                </span>
-                <div>
-                    <h3>Name what you feel</h3>
-                    <p class="text-muted m-0">Not sure what you’re feeling? Use the wheel to name your emotion so you can hold power over it.</p>
-                </div>
-            </article>
-
-            <article class="card flex gap-4 items-start">
-                <span class="inline-flex items-center justify-center w-12 h-12 rounded-full shrink-0"
-                      style="color:var(--color-brand-green); background:var(--color-emo-disgust-soft)" aria-hidden="true">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 3l1.7 4.8L18.5 9.5l-4.8 1.7L12 16l-1.7-4.8L5.5 9.5l4.8-1.7z" /><path d="M18 14l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z" />
-                    </svg>
-                </span>
-                <div>
-                    <h3>Tips you can trust</h3>
-                    <p class="text-muted m-0">Get mental-wellness tips matched to your mood, drawn from vetted, science-backed sources.</p>
-                </div>
-            </article>
-
-            <article class="card flex gap-4 items-start">
-                <span class="inline-flex items-center justify-center w-12 h-12 rounded-full shrink-0"
-                      style="color:var(--color-primary); background:var(--color-primary-soft)" aria-hidden="true">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
-                    </svg>
-                </span>
-                <div>
-                    <h3>Private by design</h3>
-                    <p class="text-muted m-0">Saved entries are encrypted so only you can read them — not even we can. Guests save nothing at all.</p>
-                </div>
-            </article>
-
-        </div>
-    </section>
-
-    @* ===================== Privacy / closing ===================== *@
-    <section class="mx-auto max-w-3xl px-6 py-8">
-        <div class="card text-center space-y-4" style="background:linear-gradient(180deg, var(--color-primary-soft), var(--color-surface) 72%)">
-            <span class="badge mx-auto">Privacy first</span>
-            <h2>Your words are yours — and only yours</h2>
-            <p class="text-muted max-w-2xl mx-auto">
-                When you save an entry, it’s encrypted on your device with a key only you hold. We store it as
-                scrambled text no one can read — not us, not a database admin, no one. And as a guest, nothing is
-                ever saved at all.
-            </p>
-            <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                @if (Auth.IsSignedIn)
+        @* ===================== Explore — every feature, gated ones invite sign-in ===================== *@
+        <section class="shell py-6">
+            <h2 class="text-xl mb-4">Explore</h2>
+            <div class="grid sm:grid-cols-2 gap-3">
+                @foreach (var item in ExploreItems)
                 {
-                    <a class="btn btn-primary btn-lg" href="journal">Start writing</a>
-                    <a class="btn btn-lg" href="entries">Open my journal</a>
-                }
-                else
-                {
-                    <a class="btn btn-primary btn-lg" href="signin">Get started — it’s free</a>
-                    <a class="btn btn-lg" href="journal">Try it as a guest</a>
+                    var locked = item.RequiresAuth;
+                    <a class="card-soft !p-4 no-underline flex gap-3 items-center transition hover:-translate-y-0.5"
+                       style="color:var(--color-ink)" href="@(locked ? "account" : item.Href)">
+                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0"
+                              style="color:var(--color-primary); background:var(--color-primary-soft)" aria-hidden="true">
+                            <NavIcon Name="@item.Icon" Size="20" />
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block font-semibold">@item.Label</span>
+                            <span class="block text-muted text-sm">
+                                @if (locked)
+                                {
+                                    <span class="font-semibold" style="color:var(--color-primary-hover)">Sign in to unlock →</span>
+                                }
+                                else
+                                {
+                                    @item.Blurb
+                                }
+                            </span>
+                        </span>
+                    </a>
                 }
             </div>
-        </div>
-    </section>
+        </section>
+    }
+
+    @if (!Auth.IsSignedIn)
+    {
+        @* ===================== Features (guests only) ===================== *@
+        <section class="shell py-8">
+            <h2 class="text-center mb-8">A calm place to come back to yourself</h2>
+            <div class="grid sm:grid-cols-2 gap-5">
+
+                <article class="card flex gap-4 items-start">
+                    <span class="inline-flex items-center justify-center w-12 h-12 rounded-full shrink-0"
+                          style="color:var(--color-brand-blue); background:var(--color-emo-sad-soft)" aria-hidden="true">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 20h4L19 9a2.5 2.5 0 0 0-3.5-3.5L4 16.5V20z" /><path d="M14 6.5l3.5 3.5" />
+                        </svg>
+                    </span>
+                    <div>
+                        <h3>Let it out</h3>
+                        <p class="text-muted m-0">Write out what’s on your mind and how you feel. Save it, or “shout into the wind” and let it go without a trace.</p>
+                    </div>
+                </article>
+
+                <article class="card flex gap-4 items-start">
+                    <span class="inline-flex items-center justify-center w-12 h-12 rounded-full shrink-0"
+                          style="color:#b5832f; background:var(--color-emo-happy-soft)" aria-hidden="true">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="9" /><path d="M8.5 14.5a4 4 0 0 0 7 0" />
+                            <circle cx="9" cy="9.8" r=".9" fill="currentColor" stroke="none" /><circle cx="15" cy="9.8" r=".9" fill="currentColor" stroke="none" />
+                        </svg>
+                    </span>
+                    <div>
+                        <h3>Name what you feel</h3>
+                        <p class="text-muted m-0">Not sure what you’re feeling? Use the wheel to name your emotion so you can hold power over it.</p>
+                    </div>
+                </article>
+
+                <article class="card flex gap-4 items-start">
+                    <span class="inline-flex items-center justify-center w-12 h-12 rounded-full shrink-0"
+                          style="color:var(--color-brand-green); background:var(--color-emo-disgust-soft)" aria-hidden="true">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 3l1.7 4.8L18.5 9.5l-4.8 1.7L12 16l-1.7-4.8L5.5 9.5l4.8-1.7z" /><path d="M18 14l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z" />
+                        </svg>
+                    </span>
+                    <div>
+                        <h3>Tips you can trust</h3>
+                        <p class="text-muted m-0">Get mental-wellness tips matched to your mood, drawn from vetted, science-backed sources.</p>
+                    </div>
+                </article>
+
+                <article class="card flex gap-4 items-start">
+                    <span class="inline-flex items-center justify-center w-12 h-12 rounded-full shrink-0"
+                          style="color:var(--color-primary); background:var(--color-primary-soft)" aria-hidden="true">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                        </svg>
+                    </span>
+                    <div>
+                        <h3>Private by design</h3>
+                        <p class="text-muted m-0">Saved entries are encrypted so only you can read them — not even we can. Guests save nothing at all.</p>
+                    </div>
+                </article>
+
+            </div>
+        </section>
+
+        @* ===================== Privacy / closing (guests only) ===================== *@
+        <section class="mx-auto max-w-3xl px-6 py-8">
+            <div class="card text-center space-y-4" style="background:linear-gradient(180deg, var(--color-primary-soft), var(--color-surface) 72%)">
+                <span class="badge mx-auto">Privacy first</span>
+                <h2>Your words are yours — and only yours</h2>
+                <p class="text-muted max-w-2xl mx-auto">
+                    When you save an entry, it’s encrypted on your device with a key only you hold. We store it as
+                    scrambled text no one can read — not us, not a database admin, no one. And as a guest, nothing is
+                    ever saved at all.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                    <a class="btn btn-primary btn-lg" href="account">Get started — it’s free</a>
+                    <a class="btn btn-lg" href="journal/new">Try it as a guest</a>
+                </div>
+            </div>
+        </section>
+    }
 
 </div>
 
 @code {
-    // Every navigable feature (Home and Account are structural, so excluded).
+    // Every feature a guest can discover: the journal (open to guests, so it
+    // opens the editor), each tracker (gated — invites sign-in), and help.
     private static readonly IReadOnlyList<NavItem> ExploreItems =
-        NavCatalog.All.Where(i => !i.Fixed).ToList();
+        new[] { NavCatalog.Journal with { Href = "journal/new" } }
+            .Concat(NavCatalog.Trackers)
+            .Append(NavCatalog.Help)
+            .ToList();
 
-    protected override void OnInitialized() => Auth.Changed += OnChanged;
+    protected override void OnInitialized()
+    {
+        Auth.Changed += OnChanged;
+        NavPrefs.Changed += OnChanged;
+    }
+
     private void OnChanged() => _ = InvokeAsync(StateHasChanged);
-    public void Dispose() => Auth.Changed -= OnChanged;
+
+    public void Dispose()
+    {
+        Auth.Changed -= OnChanged;
+        NavPrefs.Changed -= OnChanged;
+    }
 }

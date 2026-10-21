@@ -1,19 +1,17 @@
 namespace DoWellToDoGood.Models;
 
 /// <summary>
-/// One destination in the app's navigation. A single catalog (below) is the
-/// source of truth for the desktop nav row, the mobile bottom bar, the Home
-/// "explore" cards, and the Account customiser — so adding a page in one place
-/// lights it up everywhere.
+/// One destination in the app's navigation — either a fixed primary
+/// destination (Today, Journal, Track, Get help, Account) or a tracker that
+/// lives under Track (Sleep, Recovery, Therapy).
 /// </summary>
 /// <param name="Key">Stable id used in saved preferences (never change it).</param>
-/// <param name="Href">Route, relative to base ("" is Home).</param>
-/// <param name="Label">Full label (desktop row, cards, editor).</param>
+/// <param name="Href">Route, relative to base ("" is Today).</param>
+/// <param name="Label">Full label (desktop row, cards, editor, tabs).</param>
 /// <param name="ShortLabel">Terse label for the cramped bottom bar.</param>
 /// <param name="Icon">Icon name understood by <c>NavIcon</c>.</param>
-/// <param name="Blurb">One-line description for the Home explore cards.</param>
-/// <param name="RequiresAuth">Only shown to signed-in users.</param>
-/// <param name="Fixed">Structural anchor (Home, Account) — always shown, can't be hidden or reordered.</param>
+/// <param name="Blurb">One-line description for guest feature cards and onboarding.</param>
+/// <param name="RequiresAuth">Only usable by signed-in users.</param>
 public sealed record NavItem(
     string Key,
     string Href,
@@ -21,42 +19,68 @@ public sealed record NavItem(
     string ShortLabel,
     string Icon,
     string Blurb,
-    bool RequiresAuth = false,
-    bool Fixed = false);
+    bool RequiresAuth = false);
 
 public static class NavCatalog
 {
-    /// <summary>Declaration order is the default nav order.</summary>
-    public static readonly IReadOnlyList<NavItem> All = new[]
+    public static readonly NavItem Today = new("today", "", "Today", "Today", "home",
+        "Your day at a glance — streaks, goals, and a thought to carry with you.");
+
+    public static readonly NavItem Journal = new("journal", "journal", "Journal", "Journal", "book",
+        "Write out what's on your mind. Save it privately, or shout it into the wind.");
+
+    public static readonly NavItem Track = new("track", "track", "Track", "Track", "track",
+        "Sleep, recovery, and therapy — only the ones you choose.");
+
+    public static readonly NavItem Help = new("help", "help", "Get help", "Help", "heart",
+        "Vetted guides and helplines when you need more support.");
+
+    public static readonly NavItem Account = new("account", "account", "Account", "Account", "user",
+        "Your account, appearance, and settings.");
+
+    /// <summary>The fixed primary destinations, in display order. Never hidden or reordered.</summary>
+    public static readonly IReadOnlyList<NavItem> Primary = new[] { Today, Journal, Track, Help, Account };
+
+    /// <summary>
+    /// The trackers under Track — the only part of navigation a user customises
+    /// (which are on, and their order). Declaration order is the default order.
+    /// Keys match the pre-"Track" catalog so saved layouts carry over.
+    /// </summary>
+    public static readonly IReadOnlyList<NavItem> Trackers = new[]
     {
-        new NavItem("home", "", "Home", "Home", "home",
-            "Your calm place to start — a snapshot of your journey.", Fixed: true),
-
-        new NavItem("write", "journal", "Write", "Write", "pencil",
-            "Write out what's on your mind. Save it, or shout it into the wind."),
-
-        new NavItem("entries", "entries", "My journal", "Journal", "book",
-            "Read back through the entries you've saved.", RequiresAuth: true),
-
-        new NavItem("sleep", "sleep", "Sleep", "Sleep", "moon",
+        new NavItem("sleep", "track/sleep", "Sleep", "Sleep", "moon",
             "Log how you slept and spot what helps you rest.", RequiresAuth: true),
 
-        new NavItem("therapy", "therapy", "Therapy", "Therapy", "chat",
-            "Tools and prompts to get more from your therapy.", RequiresAuth: true),
+        new NavItem("recovery", "track/recovery", "Recovery", "Recovery", "sprout",
+            "Count your sober days and celebrate milestones.", RequiresAuth: true),
 
-        new NavItem("recovery", "recovery", "Recovery", "Recovery", "sprout",
-            "Track your sober days, goals, and milestones.", RequiresAuth: true),
-
-        new NavItem("resources", "resources", "Resources", "Guides", "compass",
-            "Vetted guides and helplines when you need more support."),
-
-        new NavItem("account", "signin", "Account", "Account", "user",
-            "Your account, appearance, and settings.", Fixed: true),
+        new NavItem("therapy", "track/therapy", "Therapy", "Therapy", "chat",
+            "Log sessions and work toward the goals you set.", RequiresAuth: true),
     };
 
-    public static NavItem? ById(string key) => All.FirstOrDefault(i => i.Key == key);
+    /// <summary>Look up a tracker by key (trackers are the only keyed, customisable items).</summary>
+    public static NavItem? ById(string key) => Trackers.FirstOrDefault(i => i.Key == key);
 
-    /// <summary>The reorderable (non-fixed) keys, in default order.</summary>
-    public static List<string> DefaultOrder() =>
-        All.Where(i => !i.Fixed).Select(i => i.Key).ToList();
+    /// <summary>The tracker keys, in default order.</summary>
+    public static List<string> DefaultOrder() => Trackers.Select(i => i.Key).ToList();
+
+    /// <summary>
+    /// Whether <paramref name="currentPath"/> (base-relative, no query) belongs
+    /// to the section at <paramref name="href"/>: an exact match, or a sub-route
+    /// ("track" owns "track/sleep/review"). The root ("") only matches itself.
+    /// </summary>
+    public static bool IsCurrent(string currentPath, string href)
+    {
+        var path = StripQuery(currentPath).Trim('/');
+        var target = href.Trim('/');
+        if (target.Length == 0) return path.Length == 0;
+        return string.Equals(path, target, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(target + "/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string StripQuery(string path)
+    {
+        var i = path.IndexOfAny(new[] { '?', '#' });
+        return i < 0 ? path : path[..i];
+    }
 }

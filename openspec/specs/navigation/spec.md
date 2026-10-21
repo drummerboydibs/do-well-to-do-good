@@ -1,60 +1,8 @@
 # navigation Specification
 
 ## Purpose
-TBD - created by archiving change add-customizable-navigation. Update Purpose after archive.
+How people move around the app: a fixed set of primary destinations (Today, Journal, Track, Get help, Account) and a create menu, presented as a five-slot bottom bar on phones and a header row on desktop, with tracker selection as the only customisation and redirects for old routes.
 ## Requirements
-### Requirement: Primary navigation destinations
-
-The system SHALL present a defined set of primary destinations drawn from a single navigation catalog. `Home` and `Account` SHALL be fixed structural anchors that always appear and cannot be hidden or reordered. Destinations marked as requiring authentication SHALL appear only to signed-in users.
-
-#### Scenario: Guest sees only public destinations
-- **WHEN** a signed-out visitor views the navigation
-- **THEN** only `Home`, public destinations (e.g. Write, Resources), and the `Sign in` entry are shown
-- **AND** authentication-gated destinations (My journal, Sleep, Therapy, Recovery) are omitted
-
-#### Scenario: Signed-in user sees gated destinations
-- **WHEN** a signed-in user views the navigation
-- **THEN** the authentication-gated destinations are shown alongside the public ones
-- **AND** the `Sign in` entry is labelled `Account`
-
-### Requirement: Responsive presentation
-
-The navigation SHALL adapt to viewport width. On wide (desktop) viewports it SHALL render as a horizontal row. On narrow (phone) viewports it SHALL render as a fixed bottom tab bar showing `Home`, the first few visible destinations as tabs, and a `More` control; the remaining destinations plus `Account` SHALL be reachable from a `More` sheet. Content SHALL clear the fixed bar so nothing is obscured.
-
-#### Scenario: Desktop shows a horizontal row
-- **WHEN** the viewport is at least the small breakpoint
-- **THEN** the primary destinations render as a horizontal pill row and the bottom bar is not shown
-
-#### Scenario: Phone shows a bottom tab bar
-- **WHEN** the viewport is below the small breakpoint
-- **THEN** a fixed bottom bar shows `Home`, up to the configured number of visible destinations, and a `More` control
-- **AND** the desktop row is hidden
-
-#### Scenario: More sheet reveals the remainder
-- **WHEN** the user activates `More` on the bottom bar
-- **THEN** a sheet opens listing the destinations that did not fit as tabs, plus `Account`
-- **AND** navigating to any item or dismissing the sheet closes it
-
-### Requirement: User-customizable layout
-
-Signed-in users SHALL be able to choose which reorderable destinations appear and in what order. The chosen order SHALL determine both the desktop row sequence and which destinations become bottom-bar tabs versus `More` overflow. A reset SHALL restore the default order with all destinations visible.
-
-#### Scenario: Reordering changes both presentations
-- **WHEN** the user moves a destination earlier in the order
-- **THEN** it appears earlier in the desktop row and is more likely to be a bottom-bar tab
-
-#### Scenario: Hiding removes a destination from navigation
-- **WHEN** the user hides a reorderable destination
-- **THEN** it no longer appears in the desktop row, bottom bar, or More sheet
-
-#### Scenario: Structural anchors are protected
-- **WHEN** the user opens the layout editor
-- **THEN** `Home` and `Account` are not offered for hiding or reordering
-
-#### Scenario: Reset restores defaults
-- **WHEN** the user chooses to reset the layout
-- **THEN** the default order is restored and every reorderable destination is visible
-
 ### Requirement: Private, cross-device persistence
 
 The navigation layout SHALL be persisted so it applies instantly on every load and syncs across a signed-in user's devices without the server learning the layout. A plaintext copy SHALL be cached in browser local storage for immediate application (and as the only store for guests). For signed-in users, an envelope-encrypted copy SHALL be stored server-side. The two SHALL be reconciled last-write-wins when the encryption vault is unlocked. The server SHALL only ever hold ciphertext of the layout.
@@ -77,15 +25,76 @@ The navigation layout SHALL be persisted so it applies instantly on every load a
 - **WHEN** the layout is stored server-side
 - **THEN** no plaintext ordering or visibility information is present in the stored value
 
-### Requirement: Feature discovery on Home
+### Requirement: Fixed primary destinations
 
-The Home page SHALL surface every feature as a card so users can discover the whole app by scrolling. Cards for authentication-gated features SHALL, for signed-out visitors, invite them to sign in rather than link into a gated page.
+The system SHALL present a fixed set of primary destinations: `Today` (the home route), `Journal`, `Track`, `Get help`, and `Account`, plus a `Create` control that opens the create menu. These destinations SHALL NOT be hidden or reordered. For signed-out visitors, `Account` SHALL be labelled `Sign in`. `Journal` SHALL open the entry editor directly for signed-out visitors, since they have no saved entries.
 
-#### Scenario: Signed-in user can jump to any feature
-- **WHEN** a signed-in user scrolls Home
-- **THEN** each feature is shown as a card linking to that feature
+#### Scenario: Guest sees the same shape
+- **WHEN** a signed-out visitor views the navigation
+- **THEN** `Today`, `Journal`, `Create`, `Track`, `Get help`, and `Sign in` are shown
 
-#### Scenario: Guest is invited to unlock gated features
+#### Scenario: Signed-in user sees Account
+- **WHEN** a signed-in user views the navigation
+- **THEN** the same destinations are shown and the last one is labelled `Account`
+
+#### Scenario: Guest Journal opens the editor
+- **WHEN** a signed-out visitor activates `Journal`
+- **THEN** they land on the new-entry editor rather than an empty list
+
+### Requirement: Five-slot responsive navigation
+
+The navigation SHALL adapt to viewport width. On phone viewports it SHALL render as a fixed bottom bar with exactly five slots: `Today`, `Journal`, `Create` (centre), `Track`, and `Account`. There SHALL be no overflow ("More") sheet. `Get help` SHALL be shown as an icon button in the header. On wide viewports, `Today`, `Journal`, and `Track` SHALL render as a horizontal row in the header, followed by a `New` button that opens the create menu, `Get help`, and `Account`. A destination SHALL show as current for its own route and every route beneath it (e.g. `Track` for `/track/sleep/review`). Content SHALL clear the fixed bar.
+
+#### Scenario: Phone shows the five-slot bar
+- **WHEN** the viewport is below the small breakpoint
+- **THEN** the bottom bar shows `Today`, `Journal`, `Create`, `Track`, and `Account`, with no `More` control
+- **AND** a `Get help` icon is shown in the header
+
+#### Scenario: Desktop shows the header row
+- **WHEN** the viewport is at least the small breakpoint
+- **THEN** the header shows `Today`, `Journal`, `Track`, a `New` button, `Get help`, and `Account`, and the bottom bar is hidden
+
+#### Scenario: Nested routes highlight their section
+- **WHEN** the user is on `/track/sleep/review` or `/journal/new`
+- **THEN** `Track` or `Journal` respectively is marked as the current page
+
+### Requirement: Tracker selection and order
+
+Users SHALL be able to choose which trackers (Sleep, Recovery, Therapy) they use and in what order, from a "Your trackers" section on the Account page. The chosen order SHALL determine the Track tab order, the order of tracker cards on Today, and the order of tracker actions in the create menu. Hidden trackers SHALL be omitted from all three, but SHALL stay reachable by URL. A reset SHALL restore the default order with every tracker on. Layouts saved before this change SHALL keep their relative tracker order and hidden trackers. Entries for non-tracker pages SHALL be ignored.
+
+#### Scenario: Reordering changes every tracker surface
+- **WHEN** the user moves Therapy above Sleep
+- **THEN** Therapy appears before Sleep in the Track tabs, on Today, and in the create menu
+
+#### Scenario: Hiding a tracker removes it everywhere
+- **WHEN** the user turns Recovery off
+- **THEN** Recovery no longer appears in the Track tabs, on Today, or in the create menu
+
+#### Scenario: Reset restores defaults
+- **WHEN** the user chooses to reset
+- **THEN** every tracker is on, in the default order
+
+#### Scenario: Old layouts migrate
+- **WHEN** a layout saved by an earlier version lists `write`, `therapy`, `resources`, `sleep` with `recovery` hidden
+- **THEN** the trackers load in the order Therapy, Sleep, Recovery with Recovery hidden
+
+### Requirement: Feature discovery
+
+Signed-out visitors SHALL see every feature on the Home (Today) route as a card, and cards for authentication-gated features SHALL invite them to sign in. Signed-in users SHALL discover features through the Track tabs, the create menu, and a "Choose what you track" link on Today that opens the tracker settings.
+
+#### Scenario: Guest sees feature cards
 - **WHEN** a signed-out visitor scrolls Home
-- **THEN** cards for gated features indicate they require signing in and link to sign in
+- **THEN** Journal, Sleep, Recovery, Therapy, and Get help appear as cards, with the gated ones linking to sign in
+
+#### Scenario: Signed-in user can find hidden trackers
+- **WHEN** a signed-in user who has turned off a tracker views Today
+- **THEN** a "Choose what you track" link opens the tracker settings on the Account page
+
+### Requirement: Legacy routes redirect
+
+Routes from the previous navigation SHALL redirect, replacing the history entry, to their new location: `/entries` → `/journal`, `/sleep` → `/track/sleep`, `/sleep/review` → `/track/sleep/review`, `/recovery` → `/track/recovery`, `/therapy` → `/track/therapy`, `/resources` → `/help`. `/signin` SHALL keep working as the Account page.
+
+#### Scenario: Old bookmark still works
+- **WHEN** a user opens `/therapy`
+- **THEN** they land on `/track/therapy`, and Back does not return to `/therapy`
 

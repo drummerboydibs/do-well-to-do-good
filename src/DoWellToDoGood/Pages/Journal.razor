@@ -1,4 +1,4 @@
-@page "/journal"
+@page "/journal/new"
 @using DoWellToDoGood.Models
 @using DoWellToDoGood.Services
 @inject AuthService Auth
@@ -26,7 +26,7 @@
             </p>
             @if (_savedToJournal)
             {
-                <p><a class="font-semibold" href="entries">See my journal →</a></p>
+                <p><a class="font-semibold" href="journal">See my journal →</a></p>
             }
 
             @if (_tip is not null)
@@ -43,7 +43,7 @@
                         <a href="@_tip.SourceUrl" target="_blank" rel="noopener noreferrer" class="font-semibold">@_tip.SourceName <span aria-hidden="true">↗</span><span class="sr-only">(opens in a new tab)</span></a>
                     </p>
                     <p class="m-0 mt-3">
-                        <button type="button" class="btn btn-ghost !min-h-0 py-1.5 text-sm" @onclick="ShuffleTip">↻ Show me another tip</button>
+                        <button type="button" class="btn btn-ghost btn-sm" @onclick="ShuffleTip">↻ Show me another tip</button>
                     </p>
                 </div>
                 <p class="text-muted text-xs max-w-lg mx-auto">General wellbeing information, not medical advice. If you’re struggling, please reach out to a professional or someone you trust.</p>
@@ -69,32 +69,29 @@
     }
     else
     {
-        <SobrietyCounters />
-        <OpenGoalsReminder />
-        <DefinitionOfDay />
-        <FaithPassageOfDay Expandable="true" />
-
         <div class="card">
-            <h1>What’s on your mind?</h1>
+            <h1 class="mb-2">What’s on your mind?</h1>
             @if (Auth.IsSignedIn)
             {
-                <p class="text-muted">
-                    This is your space. Save an entry to keep it — encrypted so only you can read it —
-                    or shout it into the wind and let it go without a trace.
-                </p>
+                <p class="text-muted mb-5">Keep it, encrypted just for you — or shout it into the wind.</p>
             }
             else
             {
-                <p class="text-muted">
-                    This is your space. Right now nothing is saved — you’re writing in the open air.
-                    <span class="font-semibold" style="color:var(--color-primary-hover)">Sign in later to keep entries privately, encrypted just for you.</span>
-                </p>
+                <p class="text-muted mb-5">Nothing is saved as a guest. <a class="font-semibold" href="account">Sign in</a> to keep entries privately.</p>
             }
 
-            <div class="field mt-6">
-                <label class="label" for="emotion">How are you feeling?</label>
+            <div class="field">
+                <label class="sr-only" for="body">Let it out</label>
+                <textarea id="body" class="textarea" rows="9" maxlength="20000"
+                          @bind="_body" @bind:event="oninput"
+                          placeholder="Whatever you’re carrying, put it here…"></textarea>
+                <span class="hint">@_body.Length / 20,000</span>
+            </div>
+
+            <div class="field">
+                <label class="label" for="emotion">How are you feeling? <span class="text-muted font-normal">(optional)</span></label>
                 <div class="flex gap-3 flex-wrap">
-                    <input id="emotion" class="input flex-1 min-w-0" type="text"
+                    <input id="emotion" class="input flex-1 min-w-[12rem]" type="text"
                            @bind="_emotion" @bind:event="oninput"
                            list="emotion-list" autocomplete="off" maxlength="40"
                            placeholder="Name it, or use the wheel…" />
@@ -102,7 +99,7 @@
                             aria-expanded="@_showWheel.ToString().ToLowerInvariant()"
                             aria-controls="wheel-region"
                             @onclick="ToggleWheel">
-                        @(_showWheel ? "Hide the Emotion Wheel" : "Show the Emotion Wheel")
+                        @(_showWheel ? "Hide the wheel" : "Emotion wheel")
                     </button>
                 </div>
                 <datalist id="emotion-list">
@@ -111,7 +108,7 @@
                         <option value="@n" />
                     }
                 </datalist>
-                <span class="hint">Not sure what to call it? Open the wheel and hover any feeling for a definition.</span>
+                <span class="hint">Not sure what to call it? The wheel defines every feeling.</span>
             </div>
 
             @if (_showWheel)
@@ -120,14 +117,6 @@
                     <EmotionWheel OnSelected="HandleEmotionSelected" />
                 </div>
             }
-
-            <div class="field">
-                <label class="label" for="body">Let it out</label>
-                <textarea id="body" class="textarea" rows="9" maxlength="20000"
-                          @bind="_body" @bind:event="oninput"
-                          placeholder="Whatever you’re carrying, put it here…"></textarea>
-                <span class="hint">@_body.Length / 20,000</span>
-            </div>
 
             @if (Auth.IsSignedIn && !Crypto.IsUnlocked && _showVault)
             {
@@ -142,7 +131,7 @@
                 </button>
                 @if (!Auth.IsSignedIn)
                 {
-                    <a class="btn btn-lg" href="signin">Sign in to save</a>
+                    <a class="btn btn-lg" href="account">Sign in to save</a>
                 }
                 else if (!Crypto.IsUnlocked)
                 {

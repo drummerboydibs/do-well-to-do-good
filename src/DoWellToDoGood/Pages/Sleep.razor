@@ -1,4 +1,4 @@
-@page "/sleep"
+@page "/track/sleep"
 @using System.Globalization
 @using DoWellToDoGood.Models
 @using DoWellToDoGood.Services
@@ -10,25 +10,22 @@
 <PageTitle>Sleep — Do Well to Do Good</PageTitle>
 
 <div class="mx-auto max-w-3xl px-6 space-y-6">
-    <div class="flex items-center justify-between gap-3 flex-wrap">
-        <div class="space-y-1 min-w-0">
-            <h1 class="m-0">Sleep journal</h1>
-            <p class="text-muted m-0">
-                Log this morning — or pick any past date to fill in or edit. Everything — your times,
-                what kept you up, your naps — is encrypted, so only you can ever read it.
-            </p>
-        </div>
-        @if (Auth.IsSignedIn)
-        {
-            <a class="btn" href="sleep/review">Review →</a>
-        }
-    </div>
+    <TrackTabs />
+
+    <PageHeader Title="Sleep journal" Subtitle="Log this morning, or pick any past date." Encrypted="Auth.IsSignedIn">
+        <Actions>
+            @if (Auth.IsSignedIn)
+            {
+                <a class="btn" href="track/sleep/review">Review →</a>
+            }
+        </Actions>
+    </PageHeader>
 
     @if (!Auth.IsSignedIn)
     {
         <div class="card text-center space-y-4">
             <p class="text-muted m-0">Sign in to keep a sleep journal — encrypted so only you can read it.</p>
-            <a class="btn btn-primary" href="signin">Sign in</a>
+            <a class="btn btn-primary" href="account">Sign in</a>
         </div>
     }
     else if (!Crypto.IsUnlocked)
@@ -43,7 +40,7 @@
                 <h2 id="log-h" class="m-0 text-base font-bold">@(_existingId is null ? "Log a night" : "Edit this night")</h2>
                 <div class="flex items-center gap-3 flex-wrap">
                     <label class="text-sm text-muted" for="night">Morning of</label>
-                    <input id="night" class="input !min-h-0 py-1 w-auto" type="date" max="@_todayStr"
+                    <input id="night" class="input w-auto" type="date" max="@_todayStr"
                            value="@_nightStr" @onchange="OnNightChanged" />
                 </div>
             </div>
@@ -70,25 +67,6 @@
                 </p>
             }
 
-            @* Night wake-ups *@
-            <div class="space-y-3">
-                <span class="label">Did you wake in the night? For how long?</span>
-                @if (_wakeups.Count == 0)
-                {
-                    <p class="text-sm text-muted m-0">No night wake-ups logged.</p>
-                }
-                @foreach (var w in _wakeups)
-                {
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <input class="input !min-h-0 py-1 w-24" type="number" min="1" max="1440" step="5"
-                               @bind="w.Minutes" aria-label="Minutes awake" />
-                        <span class="text-sm text-muted">minutes awake</span>
-                        <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => _wakeups.Remove(w)">Remove</button>
-                    </div>
-                }
-                <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="AddWakeup">+ Add a wake-up</button>
-            </div>
-
             @* What was on your mind *@
             <div class="field m-0">
                 <label class="label" for="thoughts">What was on your mind while awake, or trying to sleep?</label>
@@ -96,24 +74,39 @@
                           placeholder="Anything that was turning over in your head…" @bind="_thoughts"></textarea>
             </div>
 
-            @* Daytime naps *@
-            <div class="space-y-3">
-                <span class="label">Any naps during the day?</span>
-                @if (_naps.Count == 0)
-                {
-                    <p class="text-sm text-muted m-0">No naps logged.</p>
-                }
-                @foreach (var n in _naps)
-                {
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <input class="input !min-h-0 py-1 w-24" type="number" min="1" max="1440" step="5"
-                               @bind="n.Minutes" aria-label="Nap minutes" />
-                        <span class="text-sm text-muted">minute nap</span>
-                        <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => _naps.Remove(n)">Remove</button>
+            @* Optional detail — starts open when this night already has some. *@
+            <details class="disclosure" open="@_detailsOpen">
+                <summary>Wake-ups &amp; naps @DetailsSummary</summary>
+                <div class="space-y-5 pt-3">
+                    <div class="space-y-3">
+                        <span class="label">Did you wake in the night? For how long?</span>
+                        @foreach (var w in _wakeups)
+                        {
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <input class="input w-24" type="number" min="1" max="1440" step="5"
+                                       @bind="w.Minutes" aria-label="Minutes awake" />
+                                <span class="text-sm text-muted">minutes awake</span>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => _wakeups.Remove(w)">Remove</button>
+                            </div>
+                        }
+                        <button class="btn btn-sm" @onclick="AddWakeup">+ Add a wake-up</button>
                     </div>
-                }
-                <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="AddNap">+ Add a nap</button>
-            </div>
+
+                    <div class="space-y-3">
+                        <span class="label">Any naps during the day?</span>
+                        @foreach (var n in _naps)
+                        {
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <input class="input w-24" type="number" min="1" max="1440" step="5"
+                                       @bind="n.Minutes" aria-label="Nap minutes" />
+                                <span class="text-sm text-muted">minute nap</span>
+                                <button class="btn btn-ghost btn-sm" @onclick="() => _naps.Remove(n)">Remove</button>
+                            </div>
+                        }
+                        <button class="btn btn-sm" @onclick="AddNap">+ Add a nap</button>
+                    </div>
+                </div>
+            </details>
 
             @if (_saveError is not null)
             {
@@ -147,18 +140,22 @@
                 {
                     <article class="rounded-bubble-lg border border-line shadow-soft-sm p-4"
                              style="border-left:6px solid var(--color-secondary); background:linear-gradient(180deg, var(--color-secondary-soft), var(--color-surface) 78%)">
-                        <header class="flex justify-between items-baseline gap-3 flex-wrap">
-                            <span class="font-bold">@r.Night.ToString("dddd, MMM d", CultureInfo.CurrentCulture)</span>
-                            <span class="text-sm text-muted">
-                                @if (SleepMath.EstimatedSleepMinutes(r) is { } s)
-                                {
-                                    <span class="stat-num !text-lg">@SleepMath.FormatDuration(s)</span> <span>sleep</span>
-                                }
-                                else
-                                {
-                                    <span>no times logged</span>
-                                }
+                        <header class="flex justify-between items-start gap-2">
+                            <span class="min-w-0">
+                                <span class="block font-bold">@r.Night.ToString("dddd, MMM d", CultureInfo.CurrentCulture)</span>
+                                <span class="block text-sm text-muted">
+                                    @if (SleepMath.EstimatedSleepMinutes(r) is { } s)
+                                    {
+                                        <span class="stat-num !text-lg">@SleepMath.FormatDuration(s)</span> <span>sleep</span>
+                                    }
+                                    else
+                                    {
+                                        <span>no times logged</span>
+                                    }
+                                </span>
                             </span>
+                            <ActionMenu Label="@($"Actions for the night of {r.Night.ToString("MMM d", CultureInfo.CurrentCulture)}")"
+                                        Actions="NightActions(r)" />
                         </header>
                         <p class="m-0 mt-1 text-sm text-muted flex gap-x-4 gap-y-1 flex-wrap">
                             @if (r.Bedtime is { } b && r.WakeTime is { } w)
@@ -178,13 +175,9 @@
                         {
                             <p class="m-0 mt-2 whitespace-pre-wrap">@r.Thoughts</p>
                         }
-                        <footer class="mt-3 flex gap-2 justify-end">
-                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => EditNight(r)">Edit</button>
-                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteNight(r.Night)">Delete</button>
-                        </footer>
                     </article>
                 }
-                <p class="text-sm"><a class="font-semibold" href="sleep/review">See your week &amp; month at a glance →</a></p>
+                <p class="text-sm"><a class="font-semibold" href="track/sleep/review">See your week &amp; month at a glance →</a></p>
             </section>
         }
     }
@@ -259,6 +252,25 @@
     private int? LiveInBed => SleepMath.TimeInBedMinutes(CurrentDraft);
     private int? LiveSleep => SleepMath.EstimatedSleepMinutes(CurrentDraft);
 
+    // Whether the wake-ups & naps disclosure starts open. Only re-evaluated when a
+    // night is loaded, so adding or removing rows never snaps it shut mid-edit.
+    private bool _detailsOpen;
+
+    private string DetailsSummary
+    {
+        get
+        {
+            var n = _wakeups.Count + _naps.Count;
+            return n == 0 ? "(optional)" : $"({n} logged)";
+        }
+    }
+
+    private List<MenuAction> NightActions(SleepNight r) => new()
+    {
+        new("Edit", () => EditNight(r)),
+        new("Delete", () => DeleteNight(r.Night), Danger: true),
+    };
+
     private bool HasContent =>
         ParsedBedtime is not null || ParsedWakeTime is not null
         || _wakeups.Any(w => w.Minutes > 0) || _naps.Any(n => n.Minutes > 0)
@@ -303,6 +315,7 @@
             _wakeups.AddRange(parsed.Wakeups.Select(m => new Duration { Minutes = m }));
             _naps.Clear();
             _naps.AddRange(parsed.Naps.Select(m => new Duration { Minutes = m }));
+            _detailsOpen = _wakeups.Count > 0 || _naps.Count > 0;
         }
         catch
         {
@@ -318,6 +331,7 @@
         _thoughts = "";
         _wakeups.Clear();
         _naps.Clear();
+        _detailsOpen = false;
     }
 
     private void ClearForm()

@@ -232,6 +232,8 @@ html[data-theme="dark"] #blazor-error-ui {
     .btn-ghost { background: transparent; border-color: transparent; color: var(--color-primary); }
     .btn-ghost:hover { background: var(--color-primary-soft); }
     .btn-lg { @apply min-h-[3.4rem] px-8 py-4 text-lg; }
+    /* Compact button that still clears the 44px touch-target minimum. */
+    .btn-sm { @apply min-h-[2.75rem] min-w-[2.75rem] px-4 py-2 text-sm; }
     .btn-block { @apply w-full; }
 
     .card { @apply bg-surface rounded-bubble-lg p-6 sm:p-8; border: 1px solid var(--color-line); box-shadow: var(--shadow-soft); }
@@ -333,12 +335,41 @@ html[data-theme="dark"] #blazor-error-ui {
     .bottom-nav-item.active { color: var(--color-primary); }
     .bottom-nav-item.active svg { stroke-width: 2.4; }
 
-    /* Keep the fixed bar from hiding the footer on phones. */
+    /* Raised centre "New" button in the bottom bar. */
+    .create-fab {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 2.5rem; height: 2.5rem; border-radius: 999px; margin-top: -0.4rem;
+        background: var(--color-primary); color: #fff; box-shadow: var(--shadow-soft-sm);
+    }
+    html[data-theme="dark"] .create-fab { color: #06222b; }
+
+    /* Header "Get help" icon on phones. */
+    .help-icon {
+        @apply inline-flex items-center justify-center rounded-full shrink-0 transition;
+        width: 2.75rem; height: 2.75rem; color: var(--color-primary);
+    }
+    .help-icon:hover, .help-icon.active { background: var(--color-primary-soft); }
+
+    /* Tracker tabs (Track hub) — links styled like the segmented control. */
+    .tabs {
+        @apply flex gap-0 rounded-full p-1 m-0;
+        background: var(--color-sunken);
+        border: 1.5px solid var(--color-line-strong);
+    }
+    .tab {
+        @apply flex-1 inline-flex items-center justify-center gap-2 min-h-[2.75rem] px-3 py-2 rounded-full font-semibold no-underline transition;
+        color: var(--color-muted);
+    }
+    .tab:hover { color: var(--color-ink); }
+    .tab.active { background: var(--color-surface); color: var(--color-ink); box-shadow: var(--shadow-soft-sm); }
+
+    /* Keep the fixed bar from hiding the end of the page on phones (the
+       footer is hidden there, so the clearance lives on the layout root). */
     @media (max-width: 639.98px) {
-        .has-bottom-nav { margin-bottom: calc(3.6rem + env(safe-area-inset-bottom)); }
+        .has-bottom-nav { padding-bottom: calc(3.6rem + env(safe-area-inset-bottom)); }
     }
 
-    /* ---- "More" sheet ---- */
+    /* ---- Bottom sheet (More nav, row action menus) ---- */
     .sheet-scrim { position: fixed; inset: 0; z-index: 35; background: rgba(15, 26, 34, 0.38); }
     .sheet {
         position: fixed; inset-inline: 0; bottom: 0; z-index: 40;
@@ -348,9 +379,46 @@ html[data-theme="dark"] #blazor-error-ui {
         border-top: 1px solid var(--color-line);
         box-shadow: var(--shadow-soft-lg);
         padding: 0.25rem 1rem calc(1rem + env(safe-area-inset-bottom));
+        max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain;
         animation: sheet-rise 0.22s ease;
     }
+    /* On wider screens a full-bleed sheet looks stranded — cap and centre it. */
+    @media (min-width: 640px) {
+        .sheet { max-width: 28rem; margin-inline: auto; border: 1px solid var(--color-line); border-bottom: 0; }
+    }
     @keyframes sheet-rise { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .sheet-title { @apply text-sm font-semibold text-center m-0 px-2 pb-2; color: var(--color-muted); }
+
+    /* One row in an action sheet — full-width, comfortably tappable. */
+    .sheet-action {
+        @apply flex w-full items-center gap-3 rounded-bubble px-4 font-semibold text-left cursor-pointer transition;
+        min-height: 3rem;
+        background: none; border: none; color: var(--color-ink);
+    }
+    .sheet-action:hover { background: var(--color-primary-soft); color: var(--color-primary-hover); }
+    .sheet-action.is-danger { color: var(--color-danger); }
+    .sheet-action.is-danger:hover { background: color-mix(in srgb, var(--color-danger) 12%, transparent); }
+
+    /* The ⋯ trigger on list rows. */
+    .kebab {
+        @apply inline-flex items-center justify-center rounded-full cursor-pointer shrink-0 transition;
+        width: 2.75rem; height: 2.75rem;
+        background: none; border: 1.5px solid transparent; color: var(--color-muted);
+    }
+    .kebab:hover { background: var(--color-primary-soft); color: var(--color-primary-hover); }
+
+    /* Native <details> disclosure with a chevron, used for optional form sections. */
+    .disclosure > summary {
+        @apply flex items-center gap-2 font-semibold cursor-pointer select-none;
+        min-height: 2.75rem; list-style: none; color: var(--color-primary-hover);
+    }
+    .disclosure > summary::-webkit-details-marker { display: none; }
+    .disclosure > summary::before {
+        content: ""; width: 0.5rem; height: 0.5rem; flex-shrink: 0;
+        border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+        transform: rotate(-45deg); transition: transform 0.15s ease;
+    }
+    .disclosure[open] > summary::before { transform: rotate(45deg); }
     .sheet-grip { width: 2.5rem; height: 0.3rem; border-radius: 999px; background: var(--color-line-strong); margin: 0.5rem auto 0.25rem; }
     .sheet-item {
         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
@@ -365,7 +433,7 @@ html[data-theme="dark"] #blazor-error-ui {
     /* Compact round control used by the Account nav editor (up / down). */
     .nav-ctl {
         @apply inline-flex items-center justify-center rounded-full cursor-pointer;
-        min-width: 2.2rem; min-height: 2.2rem; font-weight: 700; font-size: 0.95rem;
+        min-width: 2.75rem; min-height: 2.75rem; font-weight: 700; font-size: 0.95rem;
         background: var(--color-surface); color: var(--color-ink);
         border: 1.5px solid var(--color-line-strong);
         transition: background 0.15s ease, color 0.15s ease;
@@ -488,7 +556,9 @@ html[data-theme="dark"] #blazor-error-ui {
 .wheel-def-text { margin: 0.5rem 0 0 0; color: var(--color-muted); }
 
 /* ===================== Bubble background field ===================== */
-.bubbles { position: fixed; inset: 0; overflow: hidden; z-index: 0; pointer-events: none; }
+/* z-index -1 keeps the field behind page content without <main> needing its
+   own stacking context — which would trap page-level sheets under the bottom bar. */
+.bubbles { position: fixed; inset: 0; overflow: hidden; z-index: -1; pointer-events: none; }
 .bubble {
     position: absolute;
     width: 7rem;

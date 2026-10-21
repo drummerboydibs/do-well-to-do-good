@@ -2,7 +2,7 @@
 
 <a class="skip-link" href="#main-content">Skip to main content</a>
 
-<div class="flex flex-col min-h-screen relative">
+<div class="flex flex-col min-h-screen relative has-bottom-nav">
 
     <div class="bubbles" aria-hidden="true">
         <span class="bubble"></span>
@@ -27,11 +27,12 @@
         </div>
     </header>
 
-    <main id="main-content" class="relative z-[1] flex-1 py-12 overflow-x-clip">
+    <main id="main-content" class="relative flex-1 py-6 sm:py-12 overflow-x-clip">
         @Body
     </main>
 
-    <footer class="relative z-[1] border-t border-line mt-12 py-6 app-bar app-bar--soft backdrop-blur has-bottom-nav">
+    @* Hidden on phones — its links live under Account → About there. *@
+    <footer class="relative border-t border-line mt-12 py-6 app-bar app-bar--soft backdrop-blur hidden sm:block">
         <div class="shell flex items-center justify-between gap-4 flex-wrap">
             <div class="text-muted text-sm space-y-1">
                 <p class="m-0">Designed from the ground up for privacy. Your words are yours.</p>
@@ -45,5 +46,9 @@
     </footer>
 
     <BottomNav />
+
+    @* Outside the header and bottom bar on purpose: their backdrop blur would
+       otherwise become the containing block for the fixed-position sheet. *@
+    <CreateSheet />
 
 </div>

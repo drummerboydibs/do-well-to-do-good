@@ -1,0 +1,48 @@
+@implements IDisposable
+@inject CreateMenuState Menu
+
+@* A trigger for the app-wide create menu (the sheet itself is CreateSheet,
+   rendered once in MainLayout). Variant "bar" is the raised centre button in
+   the phone bottom bar; "button" is "+ New" in the desktop header. *@
+
+@if (Variant == "bar")
+{
+    <button type="button" class="bottom-nav-item" @ref="_trigger"
+            aria-haspopup="dialog" aria-expanded="@Expanded" @onclick="Open">
+        <span class="create-fab" aria-hidden="true"><NavIcon Name="plus" Size="24" /></span>
+        <span>New</span>
+    </button>
+}
+else
+{
+    <button type="button" class="btn btn-primary btn-sm" @ref="_trigger"
+            aria-haspopup="dialog" aria-expanded="@Expanded" @onclick="Open">
+        <NavIcon Name="plus" Size="18" /> New
+    </button>
+}
+
+@code {
+    /// <summary>"bar" (phone bottom bar) or "button" (desktop header).</summary>
+    [Parameter] public string Variant { get; set; } = "button";
+
+    private ElementReference _trigger;
+    private bool _mine; // this trigger opened the current menu
+
+    private string Expanded => Menu.IsOpen && _mine ? "true" : "false";
+
+    private void Open()
+    {
+        _mine = true;
+        Menu.Open(() => _trigger.FocusAsync());
+    }
+
+    protected override void OnInitialized() => Menu.Changed += OnChanged;
+
+    private void OnChanged()
+    {
+        if (!Menu.IsOpen) _mine = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Menu.Changed -= OnChanged;
+}

@@ -1,0 +1,81 @@
+@inject AuthService Auth
+@inject EntriesService Store
+@inject StatsService Stats
+
+@* "Your journey" — saved entries, shouts, and the day streak, for Today.
+   Needs no unlock: saved entries are counted from their (plaintext)
+   timestamps, and shouts are a local count and dates — never any words. *@
+@if (Auth.IsSignedIn)
+{
+    <section class="card space-y-3 mb-6" aria-labelledby="stats-heading">
+        <h2 id="stats-heading" class="text-base font-bold m-0">Your journey</h2>
+        @if (_loading)
+        {
+            <p class="text-muted text-sm m-0" role="status">Counting…</p>
+        }
+        else
+        {
+            <div class="grid grid-cols-3 gap-3">
+                <div class="stat">
+                    <span class="stat-num">@(_savedCount?.ToString() ?? "—")</span>
+                    <span class="stat-label">Saved @(_savedCount == 1 ? "entry" : "entries")</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-num">@_shoutCount</span>
+                    <span class="stat-label">Shouted into the wind (from this device)</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-num">@(_streak > 0 ? $"🔥 {_streak}" : "0")</span>
+                    <span class="stat-label">Day streak</span>
+                </div>
+            </div>
+            @if (_streak > 0)
+            {
+                <p class="text-muted text-sm m-0">
+                    @_streak consecutive @(_streak == 1 ? "day" : "days") of showing up for yourself — keep it going.
+                </p>
+            }
+            @if (_error)
+            {
+                <p class="text-muted text-sm m-0">Couldn't reach your saved entries just now; the count above may be incomplete.</p>
+            }
+        }
+    </section>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _error;
+    private int? _savedCount;
+    private int _shoutCount;
+    private int _streak;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsSignedIn) return;
+        var days = new List<DateOnly>();
+
+        try
+        {
+            var (count, shoutDays) = await Stats.GetShoutsAsync();
+            _shoutCount = count;
+            days.AddRange(shoutDays);
+        }
+        catch { _shoutCount = 0; }
+
+        try
+        {
+            var timestamps = await Store.ListEntryTimestampsAsync();
+            _savedCount = timestamps.Count;
+            days.AddRange(timestamps.Select(t => DateOnly.FromDateTime(t.LocalDateTime)));
+        }
+        catch
+        {
+            _savedCount = null; // shown as "—"
+            _error = true;
+        }
+
+        _streak = StatsService.CurrentStreak(days);
+        _loading = false;
+    }
+}

@@ -1,0 +1,80 @@
+@implements IDisposable
+@inject AuthService Auth
+@inject NavPrefsService NavPrefs
+@inject CreateMenuState Menu
+@inject NavigationManager Nav
+
+@* The one place to add anything new: a journal entry, then the actions for
+   each tracker the user has on, in their tracker order. Each item links
+   straight to a ready-to-fill form (query flags open collapsed forms).
+   Rendered once at the layout root; opened by any CreateMenu trigger. *@
+
+<Sheet Open="Menu.IsOpen" OnClose="() => Menu.CloseAsync(restoreFocus: true)"
+       Label="Create something new" Title="What would you like to add?">
+    <ul class="list-none m-0 p-0 space-y-1">
+        @foreach (var a in Actions())
+        {
+            <li>
+                <a class="sheet-action no-underline" href="@a.Href" @onclick="Chosen">
+                    <span class="inline-flex items-center justify-center w-9 h-9 rounded-full shrink-0"
+                          style="color:var(--color-primary); background:var(--color-primary-soft)" aria-hidden="true">
+                        <NavIcon Name="@a.Icon" Size="20" />
+                    </span>
+                    @a.Text
+                </a>
+            </li>
+        }
+    </ul>
+    @if (!Auth.IsSignedIn)
+    {
+        <p class="text-sm text-muted text-center m-0 mt-3 px-2">
+            <a class="font-semibold" href="account" @onclick="Chosen">Sign in</a> to track sleep, recovery, and therapy — privately.
+        </p>
+    }
+</Sheet>
+
+@code {
+    private sealed record CreateAction(string Text, string Href, string Icon);
+
+    // What each tracker contributes to the menu.
+    private static IEnumerable<CreateAction> ActionsFor(NavItem tracker) => tracker.Key switch
+    {
+        "sleep" => new[] { new CreateAction("Log sleep", "track/sleep", "moon") },
+        "recovery" => new[] { new CreateAction("Add a recovery counter", "track/recovery?add=1", "sprout") },
+        "therapy" => new[]
+        {
+            new CreateAction("Log a therapy session", "track/therapy?log=1", "chat"),
+            new CreateAction("Add a goal", "track/therapy?goal=1", "plus"),
+        },
+        _ => Array.Empty<CreateAction>(),
+    };
+
+    private IEnumerable<CreateAction> Actions() =>
+        new[] { new CreateAction("New journal entry", "journal/new", "pencil") }
+            .Concat(NavPrefs.VisibleItems(Auth.IsSignedIn).SelectMany(ActionsFor));
+
+    // Choosing an item navigates, and the new page takes focus. Close here too,
+    // so picking the page you're already on still dismisses the menu.
+    private Task Chosen() => Menu.CloseAsync(restoreFocus: false);
+
+    protected override void OnInitialized()
+    {
+        Menu.Changed += OnChanged;
+        Auth.Changed += OnChanged;
+        NavPrefs.Changed += OnChanged;
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? _, LocationChangedEventArgs __) =>
+        _ = InvokeAsync(() => Menu.CloseAsync(restoreFocus: false));
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Menu.Changed -= OnChanged;
+        Auth.Changed -= OnChanged;
+        NavPrefs.Changed -= OnChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+}

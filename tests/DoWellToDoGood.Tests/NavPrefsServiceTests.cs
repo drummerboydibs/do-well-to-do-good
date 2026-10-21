@@ -4,9 +4,10 @@ using DoWellToDoGood.Services;
 namespace DoWellToDoGood.Tests;
 
 /// <summary>
-/// Covers the pure reconciliation logic behind the navigation layout: catalog
-/// reconcile (drop unknown, dedupe, append new pages), reordering with clamping,
-/// auth/hidden-aware visibility, last-write-wins sync, and payload round-tripping.
+/// Covers the pure reconciliation logic behind the tracker layout: catalog
+/// reconcile (drop unknown, dedupe, append new trackers, migrate pre-Track
+/// layouts), reordering with clamping, auth/hidden-aware visibility, the
+/// first-run tracker choice, last-write-wins sync, and payload round-tripping.
 /// </summary>
 public class NavPrefsServiceTests
 {
@@ -24,34 +25,46 @@ public class NavPrefsServiceTests
     [Fact]
     public void ReconcileOrder_DropsUnknownKeys_AndDedupes()
     {
-        var result = NavPrefsService.ReconcileOrder(new[] { "resources", "resources", "nope", "write" });
+        var result = NavPrefsService.ReconcileOrder(new[] { "therapy", "therapy", "nope", "sleep" });
 
         // Known, deduped, in the given order...
-        Assert.Equal("resources", result[0]);
-        Assert.Equal("write", result[1]);
+        Assert.Equal("therapy", result[0]);
+        Assert.Equal("sleep", result[1]);
         Assert.DoesNotContain("nope", result);
-        Assert.Single(result, k => k == "resources");
+        Assert.Single(result, k => k == "therapy");
     }
 
     [Fact]
-    public void ReconcileOrder_AppendsCatalogPagesMissingFromSaved()
+    public void ReconcileOrder_AppendsTrackersMissingFromSaved()
     {
-        // Simulates an old saved layout from before some pages existed.
-        var result = NavPrefsService.ReconcileOrder(new[] { "resources", "write" });
+        // Simulates a saved layout from before a tracker existed.
+        var result = NavPrefsService.ReconcileOrder(new[] { "therapy" });
 
         Assert.Equal(Default.Count, result.Count);
-        Assert.Equal(new[] { "resources", "write" }, result.Take(2));
+        Assert.Equal("therapy", result[0]);
         foreach (var key in Default) Assert.Contains(key, result); // nothing lost
     }
 
     [Fact]
-    public void ReconcileHidden_KeepsKnownReorderableKeysOnly()
+    public void Reconcile_MigratesPreTrackLayout_KeepingTrackerOrderAndHidden()
     {
-        // "home" is a fixed anchor (not reorderable); "nope" is unknown — both dropped.
-        var hidden = NavPrefsService.ReconcileHidden(new[] { "recovery", "home", "nope" });
+        // A layout saved when every page was in the nav: non-tracker pages drop
+        // out; the trackers keep their relative order and hidden state.
+        var order = NavPrefsService.ReconcileOrder(new[] { "write", "therapy", "resources", "sleep", "entries", "recovery" });
+        var hidden = NavPrefsService.ReconcileHidden(new[] { "recovery", "write" });
+
+        Assert.Equal(new[] { "therapy", "sleep", "recovery" }, order);
+        Assert.Equal(new HashSet<string> { "recovery" }, hidden);
+    }
+
+    [Fact]
+    public void ReconcileHidden_KeepsKnownTrackerKeysOnly()
+    {
+        // "today" is a fixed destination (not a tracker); "nope" is unknown — both dropped.
+        var hidden = NavPrefsService.ReconcileHidden(new[] { "recovery", "today", "nope" });
 
         Assert.Contains("recovery", hidden);
-        Assert.DoesNotContain("home", hidden);
+        Assert.DoesNotContain("today", hidden);
         Assert.DoesNotContain("nope", hidden);
     }
 
@@ -94,14 +107,11 @@ public class NavPrefsServiceTests
     // ---- ComputeVisible ----
 
     [Fact]
-    public void ComputeVisible_Guest_ExcludesAuthGatedPages()
+    public void ComputeVisible_Guest_SeesNoTrackers()
     {
+        // Every tracker needs an account (its data is encrypted per user).
         var visible = NavPrefsService.ComputeVisible(Default, new HashSet<string>(), signedIn: false);
-
-        Assert.All(visible, i => Assert.False(i.RequiresAuth));
-        Assert.Contains(visible, i => i.Key == "write");
-        Assert.Contains(visible, i => i.Key == "resources");
-        Assert.DoesNotContain(visible, i => i.Key == "recovery");
+        Assert.Empty(visible);
     }
 
     [Fact]
@@ -114,9 +124,47 @@ public class NavPrefsServiceTests
     [Fact]
     public void ComputeVisible_ExcludesHidden()
     {
-        var hidden = new HashSet<string> { "write" };
+        var hidden = new HashSet<string> { "sleep" };
         var visible = NavPrefsService.ComputeVisible(Default, hidden, signedIn: true);
-        Assert.DoesNotContain(visible, i => i.Key == "write");
+        Assert.DoesNotContain(visible, i => i.Key == "sleep");
+        Assert.Equal(Default.Count - 1, visible.Count);
+    }
+
+    // ---- HiddenFor (first-run tracker choice) ----
+
+    [Fact]
+    public void HiddenFor_HidesEverythingNotChosen()
+    {
+        Assert.Equal(new HashSet<string> { "recovery" },
+            NavPrefsService.HiddenFor(new[] { "sleep", "therapy" }));
+    }
+
+    [Fact]
+    public void HiddenFor_AllChosen_HidesNothing()
+    {
+        Assert.Empty(NavPrefsService.HiddenFor(Default));
+    }
+
+    [Fact]
+    public void HiddenFor_NoneChosen_HidesEveryTracker_IgnoringUnknownKeys()
+    {
+        Assert.Equal(Default.ToHashSet(), NavPrefsService.HiddenFor(new[] { "nope" }));
+    }
+
+    // ---- IsCurrent (section highlighting) ----
+
+    [Theory]
+    [InlineData("", "", true)]
+    [InlineData("journal", "", false)]
+    [InlineData("track/sleep/review", "track", true)]
+    [InlineData("track", "track", true)]
+    [InlineData("tracking", "track", false)]
+    [InlineData("journal/new", "journal", true)]
+    [InlineData("track/therapy?log=1", "track/therapy", true)]
+    [InlineData("Track/Sleep", "track/sleep", true)]
+    public void IsCurrent_MatchesSectionAndSubRoutes(string path, string href, bool expected)
+    {
+        Assert.Equal(expected, NavCatalog.IsCurrent(path, href));
     }
 
     // ---- DecideSync (last-write-wins) ----
@@ -165,8 +213,8 @@ public class NavPrefsServiceTests
     {
         var when = DateTimeOffset.UtcNow;
         var wire = new NavPrefsService.Wire(
-            new List<string> { "recovery", "write", "sleep" },
-            new List<string> { "resources" },
+            new List<string> { "recovery", "therapy", "sleep" },
+            new List<string> { "therapy" },
             when);
 
         var back = NavPrefsService.Deserialize(NavPrefsService.Serialize(wire));

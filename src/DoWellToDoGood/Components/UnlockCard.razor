@@ -1,0 +1,56 @@
+@implements IDisposable
+@inject AuthService Auth
+@inject CryptoService Crypto
+
+@* The single "your private data is locked" prompt on Home. Replaces the
+   separate unlock nudges each summary widget used to show. Opens the usual
+   VaultGate (unlock, recovery code, or first-time setup) in a sheet; once
+   unlocked, CryptoService.Changed refreshes the widgets in place. *@
+@if (Auth.IsSignedIn && !Crypto.IsUnlocked)
+{
+    <div class="card-soft flex items-center justify-between gap-3 flex-wrap mb-6">
+        <p class="m-0 min-w-0">
+            <span class="font-semibold block"><span aria-hidden="true">🔒</span> Your private space is locked</span>
+            <span class="text-muted text-sm">Unlock to see your streaks, goals, and journal on this device.</span>
+        </p>
+        <button type="button" class="btn btn-primary btn-sm" @ref="_trigger" aria-haspopup="dialog" @onclick="() => _open = true">Unlock</button>
+    </div>
+
+    <Sheet Open="_open" OnClose="Close" Label="Unlock your private space">
+        <VaultGate OnUnlocked="() => _open = false" />
+    </Sheet>
+}
+
+@code {
+    private bool _open, _restoreFocus;
+    private ElementReference _trigger;
+
+    protected override void OnInitialized()
+    {
+        Auth.Changed += OnChanged;
+        Crypto.Changed += OnChanged;
+    }
+
+    private void Close()
+    {
+        _open = false;
+        _restoreFocus = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_restoreFocus)
+        {
+            _restoreFocus = false;
+            try { await _trigger.FocusAsync(); } catch { /* card gone after unlock */ }
+        }
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Auth.Changed -= OnChanged;
+        Crypto.Changed -= OnChanged;
+    }
+}

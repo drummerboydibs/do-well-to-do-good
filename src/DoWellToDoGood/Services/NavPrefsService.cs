@@ -7,8 +7,10 @@ using DoWellToDoGood.Models;
 namespace DoWellToDoGood.Services;
 
 /// <summary>
-/// The user's navigation layout: which reorderable pages show, and in what
-/// order (Home and Account are structural anchors, handled outside this).
+/// The user's tracker layout: which trackers (Sleep, Recovery, Therapy) they
+/// use, and in what order. That order drives the Track tabs, the Today cards,
+/// and the create menu. The primary destinations (Today, Journal, Track, Get
+/// help, Account) are fixed and handled outside this.
 ///
 /// Storage is hybrid, because the nav is global chrome shown on every page,
 /// yet the vault re-locks on every load:
@@ -23,9 +25,6 @@ public class NavPrefsService
 {
     private const string StorageKey = "dwtdg.nav";
 
-    /// <summary>How many reorderable tabs the bottom bar shows before "More".</summary>
-    public const int BottomBarSlots = 3;
-
     private readonly IJSRuntime _js;
     private readonly AuthService _auth;
     private readonly CryptoService _crypto;
@@ -36,6 +35,16 @@ public class NavPrefsService
     private DateTimeOffset _updatedAt = DateTimeOffset.MinValue; // MinValue = never customised
 
     public event Action? Changed;
+
+    /// <summary>
+    /// True once this session has reconciled with the encrypted server copy
+    /// (after an unlock), whether or not that succeeded. The first-run tracker
+    /// question waits for this so a choice made on another device is respected.
+    /// </summary>
+    public bool Synced { get; private set; }
+
+    /// <summary>The user has saved a tracker choice (on this or any synced device).</summary>
+    public bool IsCustomized => _updatedAt > DateTimeOffset.MinValue;
 
     public NavPrefsService(IJSRuntime js, AuthService auth, CryptoService crypto)
     {
@@ -72,6 +81,11 @@ public class NavPrefsService
         if (!_crypto.IsUnlocked) return;
         try { await SyncOnUnlockAsync(); }
         catch { /* offline / server hiccup — local cache still drives the UI */ }
+        finally
+        {
+            Synced = true;
+            Changed?.Invoke();
+        }
     }
 
     private async Task SyncOnUnlockAsync()
@@ -111,11 +125,11 @@ public class NavPrefsService
 
     public bool IsHidden(string key) => _hidden.Contains(key);
 
-    /// <summary>Every reorderable item in user order — for the Account editor.</summary>
+    /// <summary>Every tracker in user order — for the Account editor.</summary>
     public IReadOnlyList<NavItem> EditorItems() =>
         _order.Select(NavCatalog.ById).OfType<NavItem>().ToList();
 
-    /// <summary>Visible items for the current auth state, in user order.</summary>
+    /// <summary>Enabled trackers for the current auth state, in user order (none for guests).</summary>
     public IReadOnlyList<NavItem> VisibleItems(bool signedIn) => ComputeVisible(_order, _hidden, signedIn);
 
     /// <summary>Pure projection of an order + hidden set to the visible items for an auth state.</summary>
@@ -129,7 +143,7 @@ public class NavPrefsService
 
     public Task ToggleHiddenAsync(string key, bool hidden)
     {
-        if (NavCatalog.ById(key) is not { Fixed: false }) return Task.CompletedTask;
+        if (NavCatalog.ById(key) is null) return Task.CompletedTask;
         if (hidden) _hidden.Add(key); else _hidden.Remove(key);
         return CommitAsync();
     }
@@ -156,6 +170,23 @@ public class NavPrefsService
         result.Insert(target, key);
         return result;
     }
+
+    /// <summary>Turn on exactly <paramref name="enabled"/> (the first-run question's answer).</summary>
+    public Task SetTrackersAsync(IEnumerable<string> enabled)
+    {
+        _hidden = HiddenFor(enabled);
+        return CommitAsync();
+    }
+
+    /// <summary>Pure: the hidden set that leaves only <paramref name="enabled"/> trackers on.</summary>
+    internal static HashSet<string> HiddenFor(IEnumerable<string> enabled)
+    {
+        var on = enabled.ToHashSet();
+        return NavCatalog.DefaultOrder().Where(k => !on.Contains(k)).ToHashSet();
+    }
+
+    /// <summary>Keep the current layout but record that the user has made a choice ("Skip for now").</summary>
+    public Task ConfirmAsync() => CommitAsync();
 
     public Task ResetAsync()
     {
@@ -189,6 +220,8 @@ public class NavPrefsService
     /// <summary>
     /// Merge a saved layout with the current catalog so the app survives pages
     /// being added or removed between versions: drop unknown keys, append new ones.
+    /// (Layouts from before the Track hub listed every page; this keeps just the
+    /// trackers, in their saved relative order.)
     /// </summary>
     private void Reconcile(IEnumerable<string>? savedOrder, IEnumerable<string>? savedHidden)
     {
@@ -207,7 +240,7 @@ public class NavPrefsService
         return order;
     }
 
-    /// <summary>Saved hidden set, filtered to known reorderable keys.</summary>
+    /// <summary>Saved hidden set, filtered to known tracker keys.</summary>
     internal static HashSet<string> ReconcileHidden(IEnumerable<string>? savedHidden) =>
         (savedHidden ?? Enumerable.Empty<string>()).Where(NavCatalog.DefaultOrder().Contains).ToHashSet();
 

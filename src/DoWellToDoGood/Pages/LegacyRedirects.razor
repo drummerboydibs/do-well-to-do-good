@@ -1,0 +1,32 @@
+@page "/entries"
+@page "/sleep"
+@page "/sleep/review"
+@page "/recovery"
+@page "/therapy"
+@page "/resources"
+@inject NavigationManager Nav
+
+@* Routes from before the Today / Journal / Track layout. Each forwards to its
+   new home, replacing the history entry so Back doesn't bounce here again.
+   Any query string comes along. *@
+
+@code {
+    private static readonly Dictionary<string, string> Targets = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["entries"] = "journal",
+        ["sleep"] = "track/sleep",
+        ["sleep/review"] = "track/sleep/review",
+        ["recovery"] = "track/recovery",
+        ["therapy"] = "track/therapy",
+        ["resources"] = "help",
+    };
+
+    protected override void OnInitialized()
+    {
+        var relative = Nav.ToBaseRelativePath(Nav.Uri);
+        var cut = relative.IndexOfAny(new[] { '?', '#' });
+        var path = (cut < 0 ? relative : relative[..cut]).Trim('/');
+        var rest = cut < 0 ? "" : relative[cut..];
+        Nav.NavigateTo((Targets.TryGetValue(path, out var target) ? target : "") + rest, replace: true);
+    }
+}

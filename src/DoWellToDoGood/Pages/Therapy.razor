@@ -1,14 +1,25 @@
-@page "/therapy"
+@page "/track/therapy"
 @using DoWellToDoGood.Services
 @inject AuthService Auth
 @inject CryptoService Crypto
 @inject TherapyService Svc
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
 <PageTitle>Therapy &amp; goals — Do Well to Do Good</PageTitle>
 
-@* Open-goal card template (declared before use). *@
+@* Progress-note and open-goal card templates (declared before use). *@
 @{
+    RenderFragment<(GoalVm Goal, ProgressVm Note)> ProgressItem = x =>
+    @<li class="rounded-bubble bg-surface-2 border border-line p-3">
+        <div class="flex justify-between items-center gap-2">
+            <span class="text-xs text-muted">@FormatDate(x.Note.Date)</span>
+            <button class="btn btn-ghost btn-sm" aria-label="@($"Remove progress note from {FormatDate(x.Note.Date)}")"
+                    @onclick="() => DeleteProgress(x.Goal, x.Note)">Remove</button>
+        </div>
+        <p class="m-0 whitespace-pre-wrap">@x.Note.Note</p>
+    </li>;
+
     RenderFragment<GoalVm> GoalCard = g =>
     @<article class="card space-y-4">
         @if (g.Editing)
@@ -19,21 +30,21 @@
             </div>
             <div class="flex items-center gap-3 flex-wrap">
                 <label class="text-sm text-muted" for="edit-end-@g.Id">Target date</label>
-                <input id="edit-end-@g.Id" class="input !min-h-0 py-1 w-auto" type="date" @bind="g.EditEnd" />
+                <input id="edit-end-@g.Id" class="input w-auto" type="date" @bind="g.EditEnd" />
                 @if (g.EditEnd is not null)
                 {
-                    <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => g.EditEnd = null">Clear date</button>
+                    <button type="button" class="btn btn-ghost btn-sm" @onclick="() => g.EditEnd = null">Clear date</button>
                 }
             </div>
             <div class="flex gap-2">
-                <button class="btn btn-primary !min-h-0 py-2" @onclick="() => SaveEdit(g)">Save</button>
-                <button class="btn btn-ghost !min-h-0 py-2" @onclick="() => g.Editing = false">Cancel</button>
+                <button class="btn btn-primary btn-sm" @onclick="() => SaveEdit(g)">Save</button>
+                <button class="btn btn-ghost btn-sm" @onclick="() => g.Editing = false">Cancel</button>
             </div>
         }
         else
         {
-            <header class="flex justify-between items-start gap-3 flex-wrap">
-                <div>
+            <header class="flex justify-between items-start gap-2">
+                <div class="min-w-0">
                     <h3 class="m-0">@g.Title</h3>
                     @if (g.End is not null)
                     {
@@ -47,52 +58,66 @@
                         <p class="text-sm text-muted m-0 mt-1">No end date</p>
                     }
                 </div>
-                <div class="flex gap-2">
-                    <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => StartEdit(g)">Edit</button>
-                    <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => SetDone(g, true)">Mark done</button>
-                    <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteGoal(g)">Delete</button>
-                </div>
+                <ActionMenu Label="@($"Actions for goal: {g.Title}")" Actions="GoalActions(g)" />
             </header>
 
+            @* Latest progress up front; the rest folded away. *@
             @if (g.Progress.Count > 0)
             {
-                <ul class="space-y-2 m-0 pl-0" style="list-style:none">
-                    @foreach (var p in g.Progress)
-                    {
-                        <li class="rounded-bubble bg-surface-2 border border-line p-3">
-                            <div class="flex justify-between items-baseline gap-2 flex-wrap">
-                                <span class="text-xs text-muted">@FormatDate(p.Date)</span>
-                                <button class="btn btn-ghost text-xs !min-h-0 !py-0.5 !px-1.5" @onclick="() => DeleteProgress(g, p)">Remove</button>
-                            </div>
-                            <p class="m-0 mt-1 whitespace-pre-wrap">@p.Note</p>
-                        </li>
-                    }
-                </ul>
+                <ul class="m-0 pl-0" style="list-style:none">@ProgressItem((g, g.Progress[0]))</ul>
+                @if (g.Progress.Count > 1)
+                {
+                    <details class="disclosure">
+                        <summary>Earlier progress (@(g.Progress.Count - 1))</summary>
+                        <ul class="space-y-2 m-0 pt-2 pl-0" style="list-style:none">
+                            @foreach (var p in g.Progress.Skip(1))
+                            {
+                                @ProgressItem((g, p))
+                            }
+                        </ul>
+                    </details>
+                }
             }
 
-            <div class="card-soft space-y-3">
-                <label class="label text-sm m-0" for="prog-@g.Id">Log progress</label>
-                <textarea id="prog-@g.Id" class="textarea !min-h-[4rem]" rows="2" maxlength="5000"
-                          placeholder="What happened? e.g. Introduced myself to a stranger named Sarah." @bind="g.DraftNote"></textarea>
-                <div class="flex items-center gap-3 flex-wrap">
-                    <input class="input !min-h-0 py-1 w-auto" type="date" max="@_today" @bind="g.DraftDate" />
-                    <button class="btn btn-primary !min-h-0 py-2" disabled="@string.IsNullOrWhiteSpace(g.DraftNote)" @onclick="() => AddProgress(g)">Add</button>
+            @if (g.LoggingProgress)
+            {
+                <div class="card-soft space-y-3">
+                    <label class="label text-sm m-0" for="prog-@g.Id">Log progress</label>
+                    <textarea id="prog-@g.Id" class="textarea !min-h-[4rem]" rows="2" maxlength="5000"
+                              placeholder="What happened? e.g. Introduced myself to a stranger named Sarah." @bind="g.DraftNote"></textarea>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <input class="input w-auto" type="date" max="@_today" @bind="g.DraftDate" aria-label="Progress date" />
+                        <button class="btn btn-primary btn-sm" disabled="@string.IsNullOrWhiteSpace(g.DraftNote)" @onclick="() => AddProgress(g)">Add</button>
+                        <button class="btn btn-ghost btn-sm" @onclick="() => g.LoggingProgress = false">Cancel</button>
+                    </div>
                 </div>
-            </div>
+            }
+            else
+            {
+                <button type="button" class="btn btn-sm" @onclick="() => g.LoggingProgress = true">+ Log progress</button>
+            }
         }
     </article>;
+
 }
 
 <div class="mx-auto max-w-3xl px-6 space-y-6">
-    <h1>Therapy &amp; goals</h1>
+    <TrackTabs />
 
-    <SobrietyCounters />
+    <PageHeader Title="Therapy & goals" Subtitle="Log sessions and work toward the goals you set." Encrypted="Auth.IsSignedIn">
+        <Actions>
+            @if (Ready && !_showLog)
+            {
+                <button type="button" class="btn btn-primary" @onclick="OpenLog">+ Log a session</button>
+            }
+        </Actions>
+    </PageHeader>
 
     @if (!Auth.IsSignedIn)
     {
         <div class="card text-center space-y-4">
             <p class="text-muted m-0">Sign in to log therapy sessions and track goals — encrypted so only you can read them.</p>
-            <a class="btn btn-primary" href="signin">Sign in</a>
+            <a class="btn btn-primary" href="account">Sign in</a>
         </div>
     }
     else if (!Crypto.IsUnlocked)
@@ -105,60 +130,67 @@
     }
     else
     {
-        @* ---------- Log a session ---------- *@
-        <section class="card space-y-4" aria-labelledby="log-h">
-            <h2 id="log-h" class="m-0">Log a therapy session</h2>
+        @if (_sessionSaved)
+        {
+            <p class="badge m-0" role="status">Session logged. 🌱</p>
+        }
 
-            <div class="field">
-                <label class="label" for="s-date">Session date</label>
-                <input id="s-date" class="input" type="date" max="@_today" @bind="_sessionDate" />
-            </div>
+        @* ---------- Log a session (opened from the header button) ---------- *@
+        @if (_showLog)
+        {
+            <section class="card space-y-4" aria-labelledby="log-h">
+                <h2 id="log-h" class="m-0">Log a therapy session</h2>
 
-            <div class="field">
-                <label class="label" for="s-notes">Session notes</label>
-                <textarea id="s-notes" class="textarea" rows="5" maxlength="20000" @bind="_sessionNotes"
-                          placeholder="What came up, what helped, anything you want to remember…"></textarea>
-            </div>
+                <div class="field m-0">
+                    <label class="label" for="s-date">Session date</label>
+                    <input id="s-date" class="input" type="date" max="@_today" @bind="_sessionDate" />
+                </div>
 
-            <div class="space-y-3">
-                <p class="label m-0">Goals from this session <span class="text-muted font-normal">(optional, up to 4)</span></p>
-                @for (int i = 0; i < _goalDrafts.Count; i++)
-                {
-                    var d = _goalDrafts[i];
-                    <div class="card-soft space-y-3">
-                        <div class="flex justify-between items-center gap-2">
-                            <span class="font-semibold text-sm">Goal @(i + 1)</span>
-                            <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => RemoveGoalDraft(d)">Remove</button>
+                <div class="field m-0">
+                    <label class="label" for="s-notes">Session notes</label>
+                    <textarea id="s-notes" @ref="_notesEl" class="textarea" rows="5" maxlength="20000" @bind="_sessionNotes"
+                              placeholder="What came up, what helped, anything you want to remember…"></textarea>
+                </div>
+
+                <div class="space-y-3">
+                    @for (int i = 0; i < _goalDrafts.Count; i++)
+                    {
+                        var d = _goalDrafts[i];
+                        <div class="card-soft space-y-3">
+                            <div class="flex justify-between items-center gap-2">
+                                <span class="font-semibold text-sm">Goal @(i + 1)</span>
+                                <button type="button" class="btn btn-ghost btn-sm" @onclick="() => RemoveGoalDraft(d)">Remove</button>
+                            </div>
+                            <input class="input" type="text" maxlength="200" aria-label="@($"Goal {i + 1}")"
+                                   placeholder="e.g. Introduce yourself to two strangers" @bind="d.Title" />
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <label class="text-sm text-muted" for="g-end-@i">Target date (optional)</label>
+                                <input id="g-end-@i" class="input w-auto" type="date" min="@_today" @bind="d.End" />
+                                @if (d.End is not null)
+                                {
+                                    <button type="button" class="btn btn-ghost btn-sm" @onclick="() => d.End = null">Clear date</button>
+                                }
+                            </div>
                         </div>
-                        <input class="input" type="text" maxlength="200" placeholder="e.g. Introduce yourself to two strangers" @bind="d.Title" />
-                        <div class="flex items-center gap-3 flex-wrap">
-                            <label class="text-sm text-muted" for="g-end-@i">Target date (optional)</label>
-                            <input id="g-end-@i" class="input !min-h-0 py-1 w-auto" type="date" min="@_today" @bind="d.End" />
-                            @if (d.End is not null)
-                            {
-                                <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => d.End = null">Clear date</button>
-                            }
-                        </div>
-                    </div>
-                }
-                @if (_goalDrafts.Count < 4)
-                {
-                    <button type="button" class="btn !min-h-0 py-2" @onclick="AddGoalDraft">+ Add a goal</button>
-                }
-            </div>
+                    }
+                    @if (_goalDrafts.Count < 4)
+                    {
+                        <button type="button" class="btn btn-sm" @onclick="AddGoalDraft">+ Add a goal from this session</button>
+                    }
+                </div>
 
-            @if (_sessionError is not null)
-            {
-                <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_sessionError</p>
-            }
-            @if (_sessionSaved)
-            {
-                <p class="text-sm font-semibold m-0" style="color:var(--color-success)" role="status">Session logged. 🌱</p>
-            }
-            <button class="btn btn-primary" disabled="@_savingSession" @onclick="SaveSession">
-                @(_savingSession ? "Encrypting & saving…" : "Log session")
-            </button>
-        </section>
+                @if (_sessionError is not null)
+                {
+                    <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_sessionError</p>
+                }
+                <div class="flex gap-2 flex-wrap">
+                    <button class="btn btn-primary" disabled="@_savingSession" @onclick="SaveSession">
+                        @(_savingSession ? "Encrypting & saving…" : "Log session")
+                    </button>
+                    <button class="btn btn-ghost" disabled="@_savingSession" @onclick="CloseLog">Cancel</button>
+                </div>
+            </section>
+        }
 
         @* ---------- Open goals ---------- *@
         <section class="space-y-4" aria-labelledby="goals-h">
@@ -166,7 +198,7 @@
                 <h2 id="goals-h" class="m-0">Open goals</h2>
                 @if (!_showAddGoal)
                 {
-                    <button type="button" class="btn !min-h-0 py-2" aria-label="Add a standalone goal" @onclick="ToggleAddGoal">+ Add a goal</button>
+                    <button type="button" class="btn btn-sm" aria-label="Add a standalone goal" @onclick="ToggleAddGoal">+ Add a goal</button>
                 }
             </div>
 
@@ -178,43 +210,48 @@
                         <input id="new-goal-title" class="input" type="text" maxlength="200"
                                placeholder="e.g. Take a walk outside three times this week" @bind="_newGoalTitle" />
                     </div>
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <label class="text-sm text-muted" for="new-goal-end">Target date (optional)</label>
-                        <input id="new-goal-end" class="input !min-h-0 py-1 w-auto" type="date" min="@_today" @bind="_newGoalEnd" />
-                        @if (_newGoalEnd is not null)
-                        {
-                            <button type="button" class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => _newGoalEnd = null">Clear date</button>
-                        }
-                    </div>
-                    @if (_sessionOptions.Count > 0)
-                    {
-                        <div class="field m-0">
-                            <label class="label" for="new-goal-session">Link to a session <span class="text-muted font-normal">(optional)</span></label>
-                            <select id="new-goal-session" class="input" @bind="_newGoalSessionKey">
-                                <option value="">Not linked to a session</option>
-                                @foreach (var o in _sessionOptions)
+                    <details class="disclosure">
+                        <summary>More options</summary>
+                        <div class="space-y-3 pt-2">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <label class="text-sm text-muted" for="new-goal-end">Target date (optional)</label>
+                                <input id="new-goal-end" class="input w-auto" type="date" min="@_today" @bind="_newGoalEnd" />
+                                @if (_newGoalEnd is not null)
                                 {
-                                    <option value="@o.Id">@FormatDate(DateOnly.FromDateTime(o.CreatedAt.LocalDateTime))</option>
+                                    <button type="button" class="btn btn-ghost btn-sm" @onclick="() => _newGoalEnd = null">Clear date</button>
                                 }
-                            </select>
+                            </div>
+                            @if (_sessionOptions.Count > 0)
+                            {
+                                <div class="field m-0">
+                                    <label class="label" for="new-goal-session">Link to a session <span class="text-muted font-normal">(optional)</span></label>
+                                    <select id="new-goal-session" class="input" @bind="_newGoalSessionKey">
+                                        <option value="">Not linked to a session</option>
+                                        @foreach (var o in _sessionOptions)
+                                        {
+                                            <option value="@o.Id">@FormatDate(DateOnly.FromDateTime(o.CreatedAt.LocalDateTime))</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
                         </div>
-                    }
+                    </details>
                     @if (_addGoalError is not null)
                     {
                         <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@_addGoalError</p>
                     }
                     <div class="flex gap-2">
-                        <button class="btn btn-primary !min-h-0 py-2" disabled="@_savingGoal" @onclick="SaveNewGoal">
+                        <button class="btn btn-primary btn-sm" disabled="@_savingGoal" @onclick="SaveNewGoal">
                             @(_savingGoal ? "Encrypting & saving…" : "Save goal")
                         </button>
-                        <button class="btn btn-ghost !min-h-0 py-2" disabled="@_savingGoal" @onclick="ToggleAddGoal">Cancel</button>
+                        <button class="btn btn-ghost btn-sm" disabled="@_savingGoal" @onclick="ToggleAddGoal">Cancel</button>
                     </div>
                 </div>
             }
 
             @if (_openGoals.Count == 0 && !_showAddGoal)
             {
-                <div class="card-soft text-muted">No open goals yet. Add one when you log a session above, or with “+ Add a goal”.</div>
+                <EmptyState Message="No open goals yet. Set one when you log a session, or add one on its own." />
             }
             @foreach (var g in _openGoals)
             {
@@ -224,17 +261,14 @@
 
         @if (_doneGoals.Count > 0)
         {
-            <details class="card-soft">
-                <summary class="font-semibold cursor-pointer">Completed goals (@_doneGoals.Count)</summary>
+            <details class="card-soft disclosure">
+                <summary>Completed goals (@_doneGoals.Count)</summary>
                 <div class="space-y-3 mt-3">
                     @foreach (var g in _doneGoals)
                     {
-                        <div class="rounded-bubble border border-line p-3 flex justify-between items-center gap-3 flex-wrap">
-                            <span class="line-through text-muted">@g.Title</span>
-                            <span class="flex gap-2">
-                                <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => SetDone(g, false)">Reopen</button>
-                                <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteGoal(g)">Delete</button>
-                            </span>
+                        <div class="rounded-bubble border border-line p-3 flex justify-between items-center gap-2">
+                            <span class="line-through text-muted min-w-0">@g.Title</span>
+                            <ActionMenu Label="@($"Actions for completed goal: {g.Title}")" Actions="DoneGoalActions(g)" />
                         </div>
                     }
                 </div>
@@ -243,8 +277,8 @@
 
         @if (_sessionTotal > 0)
         {
-            <details class="card-soft">
-                <summary class="font-semibold cursor-pointer">Past sessions (@_sessionTotal)</summary>
+            <details class="card-soft disclosure">
+                <summary>Past sessions (@_sessionTotal)</summary>
                 <div class="space-y-4 mt-3">
                     @foreach (var s in _sessions)
                     {
@@ -264,23 +298,17 @@
                                     <p class="text-sm font-semibold m-0" style="color:var(--color-danger)" role="alert">@s.Error</p>
                                 }
                                 <div class="flex gap-2">
-                                    <button class="btn btn-primary !min-h-0 py-2" disabled="@(s.Saving || string.IsNullOrWhiteSpace(s.EditNotes))" @onclick="() => SaveSessionEdit(s)">
+                                    <button class="btn btn-primary btn-sm" disabled="@(s.Saving || string.IsNullOrWhiteSpace(s.EditNotes))" @onclick="() => SaveSessionEdit(s)">
                                         @(s.Saving ? "Encrypting & saving…" : "Save")
                                     </button>
-                                    <button class="btn btn-ghost !min-h-0 py-2" disabled="@s.Saving" @onclick="() => CancelSessionEdit(s)">Cancel</button>
+                                    <button class="btn btn-ghost btn-sm" disabled="@s.Saving" @onclick="() => CancelSessionEdit(s)">Cancel</button>
                                 </div>
                             }
                             else
                             {
-                                <header class="flex justify-between items-baseline gap-3 flex-wrap">
+                                <header class="flex justify-between items-center gap-2">
                                     <span class="font-bold">@FormatDate(s.Date)</span>
-                                    <span class="flex gap-2">
-                                        @if (s.Decryptable)
-                                        {
-                                            <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => StartSessionEdit(s)">Edit</button>
-                                        }
-                                        <button class="btn btn-ghost text-sm !min-h-0 !py-1 !px-2" @onclick="() => DeleteSession(s)">Delete</button>
-                                    </span>
+                                    <ActionMenu Label="@($"Actions for session on {FormatDate(s.Date)}")" Actions="SessionActions(s)" />
                                 </header>
                                 @if (!string.IsNullOrWhiteSpace(s.Notes))
                                 {
@@ -326,7 +354,9 @@
     // Log-session form
     private DateOnly _sessionDate = DateOnly.FromDateTime(DateTime.Today);
     private string _sessionNotes = "";
-    private readonly List<GoalDraft> _goalDrafts = new() { new() };
+    private readonly List<GoalDraft> _goalDrafts = new();
+    private bool _showLog, _focusNotes;
+    private ElementReference _notesEl;
     private bool _savingSession, _sessionSaved;
     private string? _sessionError;
 
@@ -369,6 +399,7 @@
         public bool Editing;
         public string EditTitle = "";
         public DateOnly? EditEnd;
+        public bool LoggingProgress;
         public string DraftNote = "";
         public DateOnly DraftDate = DateOnly.FromDateTime(DateTime.Today);
     }
@@ -533,9 +564,74 @@
         _sessionNotes = "";
         _sessionDate = DateOnly.FromDateTime(DateTime.Today);
         _goalDrafts.Clear();
-        _goalDrafts.Add(new());
+        _showLog = false;
         _sessionSaved = true;
         await Load();
+    }
+
+    // Deep links from the create menu: ?log=1 opens the session form, ?goal=1
+    // the add-goal form. The flag is then dropped from the address (no new
+    // history entry) so choosing the same action again still works.
+    [SupplyParameterFromQuery(Name = "log")] public string? LogFlag { get; set; }
+    [SupplyParameterFromQuery(Name = "goal")] public string? GoalFlag { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (LogFlag is null && GoalFlag is null) return;
+        if (LogFlag is not null) OpenLog();
+        if (GoalFlag is not null) _showAddGoal = true;
+        Nav.NavigateTo("track/therapy", replace: true);
+    }
+
+    // The header's "Log a session" button only shows once the page has something to show.
+    private bool Ready => Auth.IsSignedIn && Crypto.IsUnlocked && !_loading;
+
+    private void OpenLog()
+    {
+        _showLog = true;
+        _sessionSaved = false;
+        _focusNotes = true; // land in the notes field once the form renders
+    }
+
+    // Cancel keeps nothing half-typed around for next time.
+    private void CloseLog()
+    {
+        _showLog = false;
+        _sessionError = null;
+        _sessionNotes = "";
+        _sessionDate = DateOnly.FromDateTime(DateTime.Today);
+        _goalDrafts.Clear();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusNotes)
+        {
+            _focusNotes = false;
+            try { await _notesEl.FocusAsync(); } catch { }
+        }
+    }
+
+    private List<MenuAction> GoalActions(GoalVm g) => new()
+    {
+        new("Edit", () => StartEdit(g)),
+        new("Mark done", () => SetDone(g, true)),
+        new("Delete", () => DeleteGoal(g), Danger: true),
+    };
+
+    private List<MenuAction> DoneGoalActions(GoalVm g) => new()
+    {
+        new("Reopen", () => SetDone(g, false)),
+        new("Delete", () => DeleteGoal(g), Danger: true),
+    };
+
+    // Edit is withheld for sessions that won't decrypt — saving would clobber the ciphertext.
+    private List<MenuAction> SessionActions(SessionVm s)
+    {
+        var actions = new List<MenuAction>();
+        if (s.Decryptable) actions.Add(new("Edit", () => StartSessionEdit(s)));
+        actions.Add(new("Delete", () => DeleteSession(s), Danger: true));
+        return actions;
     }
 
     private void ToggleAddGoal()
@@ -595,11 +691,7 @@
         if (_goalDrafts.Count < 4) _goalDrafts.Add(new());
     }
 
-    private void RemoveGoalDraft(GoalDraft d)
-    {
-        _goalDrafts.Remove(d);
-        if (_goalDrafts.Count == 0) _goalDrafts.Add(new());
-    }
+    private void RemoveGoalDraft(GoalDraft d) => _goalDrafts.Remove(d);
 
     private void StartEdit(GoalVm g)
     {
@@ -647,6 +739,7 @@
         g.Progress.Insert(0, new ProgressVm(Guid.NewGuid(), g.DraftNote.Trim(), g.DraftDate, DateTimeOffset.UtcNow));
         g.DraftNote = "";
         g.DraftDate = DateOnly.FromDateTime(DateTime.Today);
+        g.LoggingProgress = false;
     }
 
     private async Task DeleteProgress(GoalVm g, ProgressVm p)
