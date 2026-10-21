@@ -23,4 +23,78 @@
     <Exec Command="npm run build:css" />
   </Target>
 
+  <!-- Cache-bust our own static files. app.css and js/*.js ship under stable names, so
+       browsers (and the Pages CDN) keep serving an old copy after a rebuild or deploy.
+       Write a copy of wwwroot/index.html to obj/ with a short content hash stamped onto
+       each link (css/app.css?v=<hash>) and serve that copy in place of the source file,
+       so `dotnet run` and `dotnet publish` both get fresh URLs and the committed
+       index.html never churns. Runs after TailwindBuild so it hashes the new app.css. -->
+  <ItemGroup>
+    <CacheBustedAsset Include="wwwroot\css\app.css" Href="css/app.css" />
+    <CacheBustedAsset Include="wwwroot\js\theme.js" Href="js/theme.js" />
+    <CacheBustedAsset Include="wwwroot\js\wheel.js" Href="js/wheel.js" />
+    <CacheBustedAsset Include="wwwroot\js\crypto.js" Href="js/crypto.js" />
+  </ItemGroup>
+
+  <Target Name="StampIndexHtml" BeforeTargets="ResolveProjectStaticWebAssets" DependsOnTargets="TailwindBuild"
+          Condition="'$(NoBuild)' != 'true'">
+    <PropertyGroup>
+      <_StampedIndexDir>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'stamped'))</_StampedIndexDir>
+    </PropertyGroup>
+    <StampAssetVersions Source="$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', 'wwwroot', 'index.html'))"
+                        Destination="$(_StampedIndexDir)index.html" Assets="@(CacheBustedAsset)" />
+    <ItemGroup>
+      <Content Remove="wwwroot\index.html" />
+      <Content Include="$(_StampedIndexDir)index.html" Link="wwwroot\index.html" />
+      <FileWrites Include="$(_StampedIndexDir)index.html" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Discovery records the stamped file but with the project's wwwroot\ as its content
+       root, which makes the dev server (dotnet run) serve the unstamped source file.
+       Point the asset's content root at the stamped copy's folder instead. -->
+  <Target Name="ServeStampedIndexHtml" AfterTargets="ResolveProjectStaticWebAssets" Condition="'$(_StampedIndexDir)' != ''">
+    <ItemGroup>
+      <StaticWebAsset Condition="'%(Identity)' == '$(_StampedIndexDir)index.html'">
+        <ContentRoot>$(_StampedIndexDir)</ContentRoot>
+      </StaticWebAsset>
+    </ItemGroup>
+  </Target>
+
+  <UsingTask TaskName="StampAssetVersions" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Source ParameterType="System.String" Required="true" />
+      <Destination ParameterType="System.String" Required="true" />
+      <Assets ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Security.Cryptography" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var html = File.ReadAllText(Source);
+        foreach (var asset in Assets)
+        {
+            var href = asset.GetMetadata("Href");
+            if (!File.Exists(asset.ItemSpec))
+            {
+                Log.LogMessage(MessageImportance.High, "StampAssetVersions: " + asset.ItemSpec + " not found; leaving " + href + " unversioned");
+                continue;
+            }
+            byte[] hash;
+            using (var sha = SHA256.Create())
+            using (var stream = File.OpenRead(asset.ItemSpec))
+                hash = sha.ComputeHash(stream);
+            var version = BitConverter.ToString(hash).Replace("-", "").Substring(0, 10).ToLowerInvariant();
+            // Match the quoted attribute value so an already-stamped href is never stamped twice.
+            html = html.Replace("\"" + href + "\"", "\"" + href + "?v=" + version + "\"");
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(Destination));
+        // Only touch the file when the content changes, so incremental builds stay incremental.
+        if (!File.Exists(Destination) || File.ReadAllText(Destination) != html)
+            File.WriteAllText(Destination, html);
+]]></Code>
+    </Task>
+  </UsingTask>
+
 </Project>

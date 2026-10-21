@@ -39,28 +39,10 @@ jobs:
       - name: Set base href for project Pages
         run: sed -i 's|<base href="/" />|<base href="/do-well-to-do-good/" />|' release/wwwroot/index.html
 
-      # Cache-bust the stylesheet: app.css ships under a stable name, so browsers
-      # and the Pages CDN keep serving the old copy after a deploy. Stamp a
-      # content hash onto the link so each change is a fresh URL. Runs before the
-      # 404 copy below so the fallback page gets the same busted link.
-      - name: Cache-bust app.css
-        run: |
-          hash=$(md5sum release/wwwroot/css/app.css | cut -c1-10)
-          sed -i "s|css/app.css|css/app.css?v=$hash|g" release/wwwroot/index.html
-          echo "Stamped app.css?v=$hash"
+      # app.css / js/*.js links in index.html already carry a ?v=<content hash>:
+      # the StampIndexHtml target in DoWellToDoGood.csproj stamps them at build time.
 
-      # Same problem for our hand-written JS (stable names, CDN-cached). Stamp a
-      # content hash so an updated crypto.js/theme.js/wheel.js is a fresh URL and
-      # never served stale after a deploy.
-      - name: Cache-bust app JS
-        run: |
-          for f in crypto theme wheel; do
-            hash=$(md5sum release/wwwroot/js/$f.js | cut -c1-10)
-            sed -i "s|js/$f.js|js/$f.js?v=$hash|g" release/wwwroot/index.html
-            echo "Stamped $f.js?v=$hash"
-          done
-
-      # Client-side routing fallback: serve the app for unknown paths / deep links
+      # Client-side routing fallback (copied after publish, so it keeps the stamped links): serve the app for unknown paths / deep links
       - name: Add SPA 404 fallback
         run: cp release/wwwroot/index.html release/wwwroot/404.html
 
