@@ -1,9 +1,10 @@
-@page "/therapy"
+@page "/track/therapy"
 @using DoWellToDoGood.Services
 @inject AuthService Auth
 @inject CryptoService Crypto
 @inject TherapyService Svc
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
 <PageTitle>Therapy &amp; goals — Do Well to Do Good</PageTitle>
 
@@ -101,6 +102,8 @@
 }
 
 <div class="mx-auto max-w-3xl px-6 space-y-6">
+    <TrackTabs />
+
     <PageHeader Title="Therapy & goals" Subtitle="Log sessions and work toward the goals you set." Encrypted="Auth.IsSignedIn">
         <Actions>
             @if (Ready && !_showLog)
@@ -114,7 +117,7 @@
     {
         <div class="card text-center space-y-4">
             <p class="text-muted m-0">Sign in to log therapy sessions and track goals — encrypted so only you can read them.</p>
-            <a class="btn btn-primary" href="signin">Sign in</a>
+            <a class="btn btn-primary" href="account">Sign in</a>
         </div>
     }
     else if (!Crypto.IsUnlocked)
@@ -564,6 +567,20 @@
         _showLog = false;
         _sessionSaved = true;
         await Load();
+    }
+
+    // Deep links from the create menu: ?log=1 opens the session form, ?goal=1
+    // the add-goal form. The flag is then dropped from the address (no new
+    // history entry) so choosing the same action again still works.
+    [SupplyParameterFromQuery(Name = "log")] public string? LogFlag { get; set; }
+    [SupplyParameterFromQuery(Name = "goal")] public string? GoalFlag { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (LogFlag is null && GoalFlag is null) return;
+        if (LogFlag is not null) OpenLog();
+        if (GoalFlag is not null) _showAddGoal = true;
+        Nav.NavigateTo("track/therapy", replace: true);
     }
 
     // The header's "Log a session" button only shows once the page has something to show.

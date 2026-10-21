@@ -1,44 +1,48 @@
-@* Desktop primary nav — a horizontal pill row. Hidden on phones, where
-   BottomNav takes over. Home and Account are fixed anchors; everything in
-   between is the user's chosen, ordered, visible set. *@
+@* Header nav. On desktop: the Today · Journal · Track row, a "+ New" button
+   for the create menu, then Get help and Account. On phones the bottom bar
+   carries the destinations, so the header keeps only a Get help icon. *@
 @implements IDisposable
 @inject AuthService Auth
-@inject NavPrefsService NavPrefs
 @inject NavigationManager Nav
 
-<nav class="hidden sm:flex gap-x-1 gap-y-2 items-center flex-wrap justify-center" aria-label="Primary">
-    <NavLink class="nav-link" href="" Match="NavLinkMatch.All" aria-current="@CurrentMark("")">Home</NavLink>
-
-    @foreach (var item in NavPrefs.VisibleItems(Auth.IsSignedIn))
+<nav class="hidden sm:flex gap-x-1 gap-y-2 items-center flex-wrap justify-end" aria-label="Primary">
+    @foreach (var item in new[] { NavCatalog.Today, NavCatalog.Journal, NavCatalog.Track })
     {
-        <NavLink class="nav-link" href="@item.Href" aria-current="@CurrentMark(item.Href)">@item.Label</NavLink>
+        <a class="nav-link @(IsCurrent(item.Href) ? "active" : "")" href="@item.Href" aria-current="@Mark(item.Href)">@item.Label</a>
     }
-
-    <NavLink class="nav-link" href="signin" aria-current="@CurrentMark("signin")">@(Auth.IsSignedIn ? "Account" : "Sign in")</NavLink>
+    <span class="px-1"><CreateMenu Variant="button" /></span>
+    <a class="nav-link inline-flex items-center gap-1.5 @(IsCurrent("help") ? "active" : "")" href="help" aria-current="@Mark("help")">
+        <NavIcon Name="heart" Size="18" /> Get help
+    </a>
+    <a class="nav-link @(IsAccount ? "active" : "")" href="account" aria-current="@(IsAccount ? "page" : null)">
+        @(Auth.IsSignedIn ? "Account" : "Sign in")
+    </a>
 </nav>
 
+@* Phones: help is always one tap away, right in the header. *@
+<a class="help-icon sm:hidden @(IsCurrent("help") ? "active" : "")" href="help" aria-label="Get help" aria-current="@Mark("help")">
+    <NavIcon Name="heart" Size="22" />
+</a>
+
 @code {
-    private string? CurrentMark(string href)
-    {
-        var current = Nav.ToBaseRelativePath(Nav.Uri).TrimEnd('/');
-        return string.Equals(current, href.TrimEnd('/'), StringComparison.OrdinalIgnoreCase) ? "page" : null;
-    }
+    private string Path => Nav.ToBaseRelativePath(Nav.Uri);
+
+    private bool IsCurrent(string href) => NavCatalog.IsCurrent(Path, href);
+    private string? Mark(string href) => IsCurrent(href) ? "page" : null;
+    private bool IsAccount => IsCurrent("account") || IsCurrent("signin");
 
     protected override void OnInitialized()
     {
         Auth.Changed += OnChanged;
-        NavPrefs.Changed += OnChanged;
         Nav.LocationChanged += OnLocationChanged;
     }
 
-    private void OnLocationChanged(object? _, LocationChangedEventArgs __) => _ = InvokeAsync(StateHasChanged);
-
     private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnLocationChanged(object? _, LocationChangedEventArgs __) => OnChanged();
 
     public void Dispose()
     {
         Auth.Changed -= OnChanged;
-        NavPrefs.Changed -= OnChanged;
         Nav.LocationChanged -= OnLocationChanged;
     }
 }

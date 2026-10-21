@@ -1,14 +1,17 @@
-@page "/recovery"
+@page "/track/recovery"
 @using DoWellToDoGood.Models
 @using DoWellToDoGood.Services
 @inject AuthService Auth
 @inject CryptoService Crypto
 @inject SobrietyService Svc
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
 <PageTitle>Recovery — Do Well to Do Good</PageTitle>
 
 <div class="mx-auto max-w-3xl px-6 space-y-6">
+    <TrackTabs />
+
     <PageHeader Title="Recovery" Subtitle="Count the time you're free from what you're leaving behind." Encrypted="Auth.IsSignedIn">
         <Actions>
             @if (Auth.IsSignedIn && Crypto.IsUnlocked && !_loading && _counters.Count > 0 && !_showAdd)
@@ -22,7 +25,7 @@
     {
         <div class="card text-center space-y-4">
             <p class="text-muted m-0">Sign in to track recovery streaks — encrypted so only you can read them.</p>
-            <a class="btn btn-primary" href="signin">Sign in</a>
+            <a class="btn btn-primary" href="account">Sign in</a>
         </div>
     }
     else if (!Crypto.IsUnlocked)
@@ -151,7 +154,7 @@
                             <p class="m-0 text-sm text-muted">
                                 — <a href="@c.JustReset.SourceUrl" target="_blank" rel="noopener noreferrer" class="font-semibold">@c.JustReset.SourceName <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
                             </p>
-                            <p class="m-0"><a class="font-semibold" href="resources">Recovery resources →</a></p>
+                            <p class="m-0"><a class="font-semibold" href="help">Recovery resources →</a></p>
                         </div>
                     }
                 }
@@ -162,7 +165,7 @@
         @* ---------- Resources callout ---------- *@
         <div class="card-soft flex items-center justify-between gap-3 flex-wrap">
             <p class="m-0 text-muted">Need support right now? You don't have to do this alone.</p>
-            <a class="btn btn-sm" href="resources">Recovery resources →</a>
+            <a class="btn btn-sm" href="help">Recovery resources →</a>
         </div>
     }
 </div>
@@ -280,6 +283,17 @@
         new("I had a setback", () => StartReset(c)),
         new("Delete", () => DeleteCounter(c), Danger: true),
     };
+
+    // Deep link from the create menu: ?add=1 opens the add-counter form, then
+    // the flag is dropped from the address so the action can be repeated.
+    [SupplyParameterFromQuery(Name = "add")] public string? AddFlag { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (AddFlag is null) return;
+        OpenAdd();
+        Nav.NavigateTo("track/recovery", replace: true);
+    }
 
     private ElementReference _newLabelEl;
     private bool _focusAdd;

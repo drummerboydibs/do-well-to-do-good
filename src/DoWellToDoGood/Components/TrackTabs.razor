@@ -1,0 +1,38 @@
+@implements IDisposable
+@inject AuthService Auth
+@inject NavPrefsService NavPrefs
+@inject NavigationManager Nav
+
+@* The tab row at the top of every tracker page: the user's enabled trackers,
+   in their order. Hidden only when there'd be nothing to switch between. *@
+@{
+    var tabs = NavPrefs.VisibleItems(Auth.IsSignedIn);
+}
+@if (tabs.Count > 1)
+{
+    <nav class="tabs" aria-label="Trackers">
+        @foreach (var t in tabs)
+        {
+            var current = NavCatalog.IsCurrent(Nav.ToBaseRelativePath(Nav.Uri), t.Href);
+            <a class="tab @(current ? "active" : "")" href="@t.Href" aria-current="@(current ? "page" : null)">
+                <NavIcon Name="@t.Icon" Size="18" /> @t.Label
+            </a>
+        }
+    </nav>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        Auth.Changed += OnChanged;
+        NavPrefs.Changed += OnChanged;
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Auth.Changed -= OnChanged;
+        NavPrefs.Changed -= OnChanged;
+    }
+}

@@ -47,4 +47,8 @@
 
     <BottomNav />
 
+    @* Outside the header and bottom bar on purpose: their backdrop blur would
+       otherwise become the containing block for the fixed-position sheet. *@
+    <CreateSheet />
+
 </div>

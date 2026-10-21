@@ -5,15 +5,25 @@
 @inject CryptoService Crypto
 @inject SobrietyService Svc
 
-@* A compact, read-only view of the user's recovery counters for Home. Renders
-   nothing when signed out, locked (Home's single UnlockCard covers that), or
-   with no counters. Full management lives on the Recovery page. *@
-@if (Auth.IsSignedIn && Crypto.IsUnlocked && _items.Count > 0)
+@* A compact, read-only view of the user's recovery counters for Today.
+   Renders nothing when signed out, locked (Today's single UnlockCard covers
+   that), or still loading. With no counters it shows a short "how to start"
+   card when ShowEmpty is set, otherwise nothing. Full management lives on
+   the Recovery page. *@
+@if (Auth.IsSignedIn && Crypto.IsUnlocked && _loaded && _items.Count == 0 && ShowEmpty)
+{
+    <div class="card space-y-3 mb-6">
+        <h2 class="m-0 text-base font-bold">Your recovery</h2>
+        <p class="m-0 text-muted">Count the days you've been free from something you're leaving behind, and celebrate the milestones.</p>
+        <a class="btn btn-sm" href="track/recovery?add=1">Add a counter</a>
+    </div>
+}
+else if (Auth.IsSignedIn && Crypto.IsUnlocked && _items.Count > 0)
 {
     <div class="card space-y-3 mb-6">
         <div class="flex items-center justify-between gap-2 flex-wrap">
             <h2 class="m-0 text-base font-bold">Your recovery</h2>
-            <a class="text-sm font-semibold" href="recovery">Manage →</a>
+            <a class="text-sm font-semibold" href="track/recovery">Manage →</a>
         </div>
         <ul class="space-y-2 m-0 pl-0" style="list-style:none">
             @foreach (var it in _items)
@@ -34,6 +44,10 @@
 }
 
 @code {
+    /// <summary>Show a teaching card instead of nothing when there are no counters.</summary>
+    [Parameter] public bool ShowEmpty { get; set; }
+
+    private bool _loaded;
     private List<Item> _items = new();
     private sealed record Item(string Name, int Days, bool Milestone, string MilestoneLabel);
 
@@ -47,6 +61,7 @@
 
     private async Task LoadAsync()
     {
+        _loaded = false;
         if (!Auth.IsSignedIn || !Crypto.IsUnlocked) { _items = new(); return; }
         try
         {
@@ -69,6 +84,7 @@
             _items = items;
         }
         catch { _items = new(); }
+        _loaded = true;
     }
 
     private async void OnChanged()

@@ -4,17 +4,29 @@
 @inject CryptoService Crypto
 @inject TherapyService Therapy
 
-@* A gentle reminder of the user's open therapy goals, for Home. Renders
-   nothing when signed out, locked (Home's single UnlockCard covers that), or
-   when there are no open goals. *@
-@if (Auth.IsSignedIn && Crypto.IsUnlocked)
+@* A gentle reminder of the user's open therapy goals, for Today. Renders
+   nothing when signed out, locked (Today's single UnlockCard covers that), or
+   still loading. With no open goals it shows a short "how to start" card
+   when ShowEmpty is set, otherwise nothing. *@
+@if (Auth.IsSignedIn && Crypto.IsUnlocked && _loaded)
 {
-    @if (_goals.Count > 0)
+    @if (_goals.Count == 0 && ShowEmpty)
+    {
+        <div class="card space-y-3 mb-6">
+            <h2 class="m-0 text-base font-bold">Your open goals</h2>
+            <p class="m-0 text-muted">Set small goals with your therapist — or on your own — and log progress as you go.</p>
+            <div class="flex gap-2 flex-wrap">
+                <a class="btn btn-sm" href="track/therapy?goal=1">Add a goal</a>
+                <a class="btn btn-ghost btn-sm" href="track/therapy?log=1">Log a session</a>
+            </div>
+        </div>
+    }
+    else if (_goals.Count > 0)
     {
         <div class="card space-y-3 mb-6">
             <div class="flex items-center justify-between gap-2 flex-wrap">
                 <h2 class="m-0 text-base font-bold">Your open goals</h2>
-                <a class="text-sm font-semibold" href="therapy">Log progress →</a>
+                <a class="text-sm font-semibold" href="track/therapy">Log progress →</a>
             </div>
             <ul class="space-y-2 m-0 pl-0" style="list-style:none">
                 @foreach (var g in _goals)
@@ -40,6 +52,10 @@
 }
 
 @code {
+    /// <summary>Show a teaching card instead of nothing when there are no open goals.</summary>
+    [Parameter] public bool ShowEmpty { get; set; }
+
+    private bool _loaded;
     private List<GoalReminder> _goals = new();
     private sealed record GoalReminder(string Title, DateOnly? End, bool Overdue);
 
@@ -53,6 +69,7 @@
 
     private async Task LoadGoalsAsync()
     {
+        _loaded = false;
         if (!Auth.IsSignedIn || !Crypto.IsUnlocked) { _goals = new(); return; }
         try
         {
@@ -72,6 +89,7 @@
             _goals = list.OrderBy(g => g.End ?? DateOnly.MaxValue).ToList();
         }
         catch { _goals = new(); }
+        _loaded = true;
     }
 
     private async void OnChanged()

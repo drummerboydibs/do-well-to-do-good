@@ -1,10 +1,9 @@
 @page "/signin"
+@page "/account"
 @using DoWellToDoGood.Models
 @using DoWellToDoGood.Services
 @inject AuthService Auth
 @inject CryptoService Crypto
-@inject EntriesService Store
-@inject StatsService Stats
 @inject ThemeService Theme
 @inject FaithService Faith
 @inject NavPrefsService NavPrefs
@@ -37,41 +36,6 @@
                 }
             </div>
 
-            <section aria-labelledby="stats-heading" class="space-y-3">
-                <h2 id="stats-heading" class="text-base font-bold m-0">Your journey</h2>
-                @if (_statsLoading)
-                {
-                    <p class="text-muted text-sm m-0" role="status">Counting…</p>
-                }
-                else
-                {
-                    <div class="grid grid-cols-3 gap-3">
-                        <div class="stat">
-                            <span class="stat-num">@(_savedCount?.ToString() ?? "—")</span>
-                            <span class="stat-label">Saved @(_savedCount == 1 ? "entry" : "entries")</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-num">@_shoutCount</span>
-                            <span class="stat-label">Shouted into the wind (from this device)</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-num">@(_streak > 0 ? $"🔥 {_streak}" : "0")</span>
-                            <span class="stat-label">Day streak</span>
-                        </div>
-                    </div>
-                    @if (_streak > 0)
-                    {
-                        <p class="text-muted text-sm m-0">
-                            @_streak consecutive @(_streak == 1 ? "day" : "days") of showing up for yourself — keep it going.
-                        </p>
-                    }
-                    @if (_statsError)
-                    {
-                        <p class="text-muted text-sm m-0">Couldn't reach your saved entries just now; the count above may be incomplete.</p>
-                    }
-                }
-            </section>
-
             <div class="space-y-3">
                 <section aria-labelledby="appearance-heading" class="space-y-2">
                     <h2 id="appearance-heading" class="text-base font-bold m-0">Appearance</h2>
@@ -89,14 +53,15 @@
                     </fieldset>
                 </section>
 
-                @* Rarely changed, so folded away. *@
-                <details class="disclosure">
-                    <summary><span id="nav-heading" class="text-base font-bold" style="color:var(--color-ink)">Customize navigation</span></summary>
+                @* Rarely changed, so folded away — unless we were sent here to change it
+                   (Today's "Choose what you track" link adds ?trackers=1). *@
+                <details class="disclosure" open="@(TrackersFlag is not null)">
+                    <summary><span id="nav-heading" class="text-base font-bold" style="color:var(--color-ink)">Your trackers</span></summary>
                     <div class="space-y-2 pt-1">
                         <p class="text-muted text-sm m-0">
-                            Choose which pages show and their order. On phones the first few become tabs
-                            on the bottom bar; the rest tuck under “More.” Home and Account always stay put.
-                            Your layout is encrypted and synced to your devices — only you can read it.
+                            Turn on the trackers you want and put them in order. The order sets the Track
+                            tabs, your Today cards, and the + menu. Your choice is encrypted and synced to
+                            your devices — only you can read it.
                         </p>
                         <p aria-live="polite" class="sr-only">@_navStatus</p>
                         @{
@@ -122,7 +87,7 @@
                                     <label class="inline-flex items-center justify-center cursor-pointer shrink-0 min-w-[2.75rem] min-h-[2.75rem]">
                                         <input type="checkbox" checked="@(!hidden)"
                                                @onchange="e => ToggleNav(item.Key, item.Label, (bool)e.Value!)" />
-                                        <span class="sr-only">Show @item.Label</span>
+                                        <span class="sr-only">Use the @item.Label tracker</span>
                                     </label>
                                 </li>
                             }
@@ -196,7 +161,7 @@
             </button>
             <p class="text-muted text-sm text-center m-0">
                 New here? The same link creates your free account. Or
-                <a href="journal">continue as a guest</a> — nothing saved, ever.
+                <a href="journal/new">continue as a guest</a> — nothing saved, ever.
             </p>
         }
     </div>
@@ -218,11 +183,6 @@
     private string? _error;
     private bool _busy, _sent;
 
-    private bool _statsLoading = true;
-    private bool _statsError;
-    private int? _savedCount;
-    private int _shoutCount;
-    private int _streak;
     private DateTimeOffset? _createdAt;
     private DateTimeOffset? _lastSignIn;
 
@@ -238,12 +198,15 @@
     {
         if (Auth.IsSignedIn)
         {
-            await LoadStatsAsync();
+            try { (_createdAt, _lastSignIn) = await Auth.GetUserMetaAsync(); }
+            catch { }
             await Faith.LoadAsync();
         }
     }
 
     // ----- Navigation editor -----
+    [SupplyParameterFromQuery(Name = "trackers")] public string? TrackersFlag { get; set; }
+
     private string _navStatus = "";       // announced via an aria-live region
     private string? _navFocusId;          // control to refocus after the list re-renders
 
@@ -264,13 +227,13 @@
     private async Task ToggleNav(string key, string label, bool show)
     {
         await NavPrefs.ToggleHiddenAsync(key, !show);
-        _navStatus = show ? $"{label} shown in navigation." : $"{label} hidden from navigation.";
+        _navStatus = show ? $"{label} tracker turned on." : $"{label} tracker turned off.";
     }
 
     private async Task ResetNav()
     {
         await NavPrefs.ResetAsync();
-        _navStatus = "Navigation reset to the default order.";
+        _navStatus = "Trackers reset: all on, in the default order.";
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -295,41 +258,6 @@
     {
         await Faith.LoadAsync(force: true);
         StateHasChanged();
-    }
-
-    private async Task LoadStatsAsync()
-    {
-        _statsLoading = true;
-        var days = new List<DateOnly>();
-
-        // Shouts are local (count + dates only — never any words).
-        try
-        {
-            var (count, shoutDays) = await Stats.GetShoutsAsync();
-            _shoutCount = count;
-            days.AddRange(shoutDays);
-        }
-        catch { _shoutCount = 0; }
-
-        // Saved entries come from the server as timestamps — no decryption needed.
-        try
-        {
-            var timestamps = await Store.ListEntryTimestampsAsync();
-            _savedCount = timestamps.Count;
-            days.AddRange(timestamps.Select(t => DateOnly.FromDateTime(t.LocalDateTime)));
-        }
-        catch
-        {
-            _savedCount = null; // shown as "—"
-            _statsError = true;
-        }
-
-        _streak = StatsService.CurrentStreak(days);
-
-        try { (_createdAt, _lastSignIn) = await Auth.GetUserMetaAsync(); }
-        catch { }
-
-        _statsLoading = false;
     }
 
     private async Task SetTheme(string preference) => await Theme.SetAsync(preference);

@@ -1,7 +1,7 @@
 # responsive-shell Specification
 
 ## Purpose
-TBD - created by archiving change add-customizable-navigation. Update Purpose after archive.
+The layout shell around every page: content width tiers, mobile-first sizing, and what the header/footer chrome does at each breakpoint.
 ## Requirements
 ### Requirement: Content width tiers
 

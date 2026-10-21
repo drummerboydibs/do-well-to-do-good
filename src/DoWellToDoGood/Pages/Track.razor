@@ -1,0 +1,48 @@
+@page "/track"
+@inject AuthService Auth
+@inject NavPrefsService NavPrefs
+@inject NavigationManager Nav
+
+<PageTitle>Track — Do Well to Do Good</PageTitle>
+
+@* The Track landing: signed-in users go straight to their first tracker. *@
+<div class="mx-auto max-w-3xl px-6 space-y-6">
+    @if (!Auth.IsSignedIn)
+    {
+        <PageHeader Title="Track" Subtitle="Private trackers for the parts of life you're working on." />
+        <div class="grid gap-3">
+            @foreach (var t in NavCatalog.Trackers)
+            {
+                <div class="card-soft !p-4 flex gap-3 items-center">
+                    <span class="inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0"
+                          style="color:var(--color-primary); background:var(--color-primary-soft)" aria-hidden="true">
+                        <NavIcon Name="@t.Icon" Size="20" />
+                    </span>
+                    <span class="min-w-0">
+                        <span class="block font-semibold">@t.Label</span>
+                        <span class="block text-muted text-sm">@t.Blurb</span>
+                    </span>
+                </div>
+            }
+        </div>
+        <EmptyState Message="Sign in to start tracking — everything is encrypted so only you can read it."
+                    ActionText="Sign in" ActionHref="account" />
+    }
+    else if (_first is null)
+    {
+        <PageHeader Title="Track" />
+        <EmptyState Message="You've turned every tracker off. Choose the ones you'd like to use."
+                    ActionText="Choose what you track" ActionHref="account?trackers=1" />
+    }
+</div>
+
+@code {
+    private NavItem? _first;
+
+    protected override void OnInitialized()
+    {
+        if (!Auth.IsSignedIn) return;
+        _first = NavPrefs.VisibleItems(signedIn: true).FirstOrDefault();
+        if (_first is not null) Nav.NavigateTo(_first.Href, replace: true);
+    }
+}

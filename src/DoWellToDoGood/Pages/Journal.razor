@@ -1,4 +1,4 @@
-@page "/journal"
+@page "/journal/new"
 @using DoWellToDoGood.Models
 @using DoWellToDoGood.Services
 @inject AuthService Auth
@@ -26,7 +26,7 @@
             </p>
             @if (_savedToJournal)
             {
-                <p><a class="font-semibold" href="entries">See my journal →</a></p>
+                <p><a class="font-semibold" href="journal">See my journal →</a></p>
             }
 
             @if (_tip is not null)
@@ -77,7 +77,7 @@
             }
             else
             {
-                <p class="text-muted mb-5">Nothing is saved as a guest. <a class="font-semibold" href="signin">Sign in</a> to keep entries privately.</p>
+                <p class="text-muted mb-5">Nothing is saved as a guest. <a class="font-semibold" href="account">Sign in</a> to keep entries privately.</p>
             }
 
             <div class="field">
@@ -131,7 +131,7 @@
                 </button>
                 @if (!Auth.IsSignedIn)
                 {
-                    <a class="btn btn-lg" href="signin">Sign in to save</a>
+                    <a class="btn btn-lg" href="account">Sign in to save</a>
                 }
                 else if (!Crypto.IsUnlocked)
                 {

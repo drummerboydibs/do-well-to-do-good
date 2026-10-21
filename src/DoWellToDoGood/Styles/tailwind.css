@@ -335,6 +335,34 @@ html[data-theme="dark"] #blazor-error-ui {
     .bottom-nav-item.active { color: var(--color-primary); }
     .bottom-nav-item.active svg { stroke-width: 2.4; }
 
+    /* Raised centre "New" button in the bottom bar. */
+    .create-fab {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 2.5rem; height: 2.5rem; border-radius: 999px; margin-top: -0.4rem;
+        background: var(--color-primary); color: #fff; box-shadow: var(--shadow-soft-sm);
+    }
+    html[data-theme="dark"] .create-fab { color: #06222b; }
+
+    /* Header "Get help" icon on phones. */
+    .help-icon {
+        @apply inline-flex items-center justify-center rounded-full shrink-0 transition;
+        width: 2.75rem; height: 2.75rem; color: var(--color-primary);
+    }
+    .help-icon:hover, .help-icon.active { background: var(--color-primary-soft); }
+
+    /* Tracker tabs (Track hub) — links styled like the segmented control. */
+    .tabs {
+        @apply flex gap-0 rounded-full p-1 m-0;
+        background: var(--color-sunken);
+        border: 1.5px solid var(--color-line-strong);
+    }
+    .tab {
+        @apply flex-1 inline-flex items-center justify-center gap-2 min-h-[2.75rem] px-3 py-2 rounded-full font-semibold no-underline transition;
+        color: var(--color-muted);
+    }
+    .tab:hover { color: var(--color-ink); }
+    .tab.active { background: var(--color-surface); color: var(--color-ink); box-shadow: var(--shadow-soft-sm); }
+
     /* Keep the fixed bar from hiding the end of the page on phones (the
        footer is hidden there, so the clearance lives on the layout root). */
     @media (max-width: 639.98px) {

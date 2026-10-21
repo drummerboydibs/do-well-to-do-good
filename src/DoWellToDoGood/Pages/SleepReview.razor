@@ -1,4 +1,4 @@
-@page "/sleep/review"
+@page "/track/sleep/review"
 @using System.Globalization
 @using DoWellToDoGood.Models
 @using DoWellToDoGood.Services
@@ -9,9 +9,11 @@
 <PageTitle>Sleep review — Do Well to Do Good</PageTitle>
 
 <div class="mx-auto max-w-3xl px-6 space-y-6">
+    <TrackTabs />
+
     <PageHeader Title="Sleep at a glance" Subtitle="Your own patterns, worked out in your browser." Encrypted="Auth.IsSignedIn">
         <Actions>
-            <a class="btn" href="sleep">← Log</a>
+            <a class="btn" href="track/sleep">← Log</a>
         </Actions>
     </PageHeader>
 
@@ -19,7 +21,7 @@
     {
         <div class="card text-center space-y-4">
             <p class="text-muted m-0">Sign in to see your sleep review — built from entries only you can decrypt.</p>
-            <a class="btn btn-primary" href="signin">Sign in</a>
+            <a class="btn btn-primary" href="account">Sign in</a>
         </div>
     }
     else if (!Crypto.IsUnlocked)

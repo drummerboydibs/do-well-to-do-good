@@ -1,31 +1,26 @@
-@page "/entries"
+@page "/journal"
 @using DoWellToDoGood.Services
 @inject AuthService Auth
 @inject CryptoService Crypto
 @inject EntriesService Store
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
-<PageTitle>My journal — Do Well to Do Good</PageTitle>
+<PageTitle>Journal — Do Well to Do Good</PageTitle>
 
 <div class="mx-auto max-w-3xl px-6 space-y-6">
-    <PageHeader Title="My journal" Encrypted="Auth.IsSignedIn">
+    <PageHeader Title="Journal" Encrypted="true">
         <Actions>
-            @if (Auth.IsSignedIn)
-            {
-                <a class="btn btn-primary" href="journal">
-                    <NavIcon Name="pencil" Size="20" />
-                    Write
-                </a>
-            }
+            <a class="btn btn-primary" href="journal/new">
+                <NavIcon Name="pencil" Size="20" />
+                New entry
+            </a>
         </Actions>
     </PageHeader>
 
     @if (!Auth.IsSignedIn)
     {
-        <div class="card text-center space-y-4">
-            <p class="text-muted m-0">Sign in to see your saved entries — encrypted so only you can read them.</p>
-            <a class="btn btn-primary" href="signin">Sign in</a>
-        </div>
+        @* Redirecting to the editor (see OnInitialized). *@
     }
     else if (!Crypto.IsUnlocked)
     {
@@ -37,8 +32,8 @@
     }
     else if (_total == 0)
     {
-        <EmptyState Message="Nothing saved yet. Your story starts whenever you're ready."
-                    ActionText="Write your first entry" ActionHref="journal" />
+        <EmptyState Message="Nothing saved yet. Your story starts whenever you're ready — tap New entry, or the + below, any time."
+                    ActionText="Write your first entry" ActionHref="journal/new" />
     }
     else
     {
@@ -113,7 +108,7 @@
 
         @* A gentle nudge at the end of the list, so finishing a read flows
            straight into writing without scrolling back to the header button. *@
-        <a href="journal" class="card-soft flex items-center justify-between gap-4 no-underline"
+        <a href="journal/new" class="card-soft flex items-center justify-between gap-4 no-underline"
            style="background:linear-gradient(180deg, var(--color-primary-soft), var(--color-surface-2) 85%)">
             <span class="min-w-0">
                 <span class="block font-semibold" style="color:var(--color-ink)">What's on your mind today?</span>
@@ -150,6 +145,12 @@
         public string EditEmotion = "";
         public bool Saving;
         public string? Error;
+    }
+
+    // Guests have nothing saved, so their Journal is simply the editor.
+    protected override void OnInitialized()
+    {
+        if (!Auth.IsSignedIn) Nav.NavigateTo("journal/new", replace: true);
     }
 
     protected override async Task OnInitializedAsync()

@@ -1,0 +1,80 @@
+@implements IDisposable
+@inject AuthService Auth
+@inject CryptoService Crypto
+@inject NavPrefsService NavPrefs
+
+@* First-run question on Today: which trackers does this person want? Shown
+   once — until a tracker choice has been saved on any device. It waits for
+   the post-unlock sync, so a choice made elsewhere is respected rather than
+   asked again. Saving or skipping both record a choice. *@
+@if (Show)
+{
+    <section class="card space-y-4 mb-6" aria-labelledby="onboard-heading"
+             style="background:linear-gradient(180deg, var(--color-primary-soft), var(--color-surface) 70%)">
+        <div class="space-y-1">
+            <h2 id="onboard-heading" class="text-xl m-0">What would you like support with?</h2>
+            <p class="text-muted m-0">Pick the trackers you'll use — the rest stay out of your way. You can change this any time in Account.</p>
+        </div>
+        <fieldset class="space-y-2 m-0 p-0 border-0">
+            <legend class="sr-only">Trackers</legend>
+            @foreach (var t in NavCatalog.Trackers)
+            {
+                <label class="flex items-start gap-3 rounded-bubble border border-line bg-surface p-3 cursor-pointer min-h-[2.75rem]">
+                    <input type="checkbox" class="mt-1" checked="@_chosen.Contains(t.Key)"
+                           @onchange="e => Toggle(t.Key, (bool)e.Value!)" />
+                    <span class="min-w-0">
+                        <span class="block font-semibold">@t.Label</span>
+                        <span class="block text-muted text-sm">@t.Blurb</span>
+                    </span>
+                </label>
+            }
+        </fieldset>
+        <div class="flex gap-2 flex-wrap">
+            <button class="btn btn-primary" disabled="@_saving" @onclick="Save">Save</button>
+            <button class="btn btn-ghost" disabled="@_saving" @onclick="Skip">Skip for now</button>
+        </div>
+    </section>
+}
+
+@code {
+    private readonly HashSet<string> _chosen = NavCatalog.DefaultOrder().ToHashSet();
+    private bool _saving;
+
+    private bool Show =>
+        Auth.IsSignedIn && Crypto.IsUnlocked && NavPrefs.Synced && !NavPrefs.IsCustomized;
+
+    private void Toggle(string key, bool on)
+    {
+        if (on) _chosen.Add(key); else _chosen.Remove(key);
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        try { await NavPrefs.SetTrackersAsync(_chosen); }
+        finally { _saving = false; }
+    }
+
+    private async Task Skip()
+    {
+        _saving = true;
+        try { await NavPrefs.ConfirmAsync(); }
+        finally { _saving = false; }
+    }
+
+    protected override void OnInitialized()
+    {
+        Auth.Changed += OnChanged;
+        Crypto.Changed += OnChanged;
+        NavPrefs.Changed += OnChanged;
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Auth.Changed -= OnChanged;
+        Crypto.Changed -= OnChanged;
+        NavPrefs.Changed -= OnChanged;
+    }
+}

@@ -1,0 +1,73 @@
+@using DoWellToDoGood.Models
+@using DoWellToDoGood.Services
+@implements IDisposable
+@inject FaithService Faith
+
+@* One "daily thought" card for Today: the word of the day (a gentle feeling
+   or wellbeing term, the same for everyone each calendar day) and, when the
+   user has chosen a tradition, that day's cited passage. The tradition choice
+   is encrypted, so the passage appears only once the vault is unlocked. *@
+<section class="card-soft space-y-4 mb-6" aria-labelledby="daily-heading">
+    <h2 id="daily-heading" class="sr-only">Daily thought</h2>
+    @if (_name is not null)
+    {
+        <div>
+            <p class="text-xs font-bold uppercase tracking-wider m-0 mb-1" style="color:var(--color-primary-hover)">Word of the day</p>
+            <p class="m-0"><span class="font-bold">@_name</span> — <span class="text-muted">@_definition</span></p>
+        </div>
+    }
+    @if (_passage is not null)
+    {
+        <div class="pt-4 border-t border-line">
+            <p class="text-xs font-bold uppercase tracking-wider m-0 mb-1" style="color:var(--color-primary-hover)">
+                A passage for today · @FaithLibrary.DisplayName(_passage.Tradition)
+            </p>
+            <p class="m-0 leading-relaxed">@_passage.Text</p>
+            <p class="m-0 mt-2 text-sm text-muted">
+                — @_passage.Reference (@_passage.Version) ·
+                <a href="@_passage.SourceUrl" target="_blank" rel="noopener noreferrer" class="font-semibold">@_passage.SourceName <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+            </p>
+        </div>
+    }
+</section>
+
+@code {
+    // Gentler feelings (non-negative valence) plus supplementary wellbeing
+    // vocabulary, in a stable order so the per-day pick is deterministic — so a
+    // random day never leads the page with a heavy feeling like grief or despair.
+    private static readonly IReadOnlyList<(string Name, string Definition)> Pool =
+        EmotionCatalog.GentleFeelings().Concat(WellnessTerms.All).ToList();
+
+    private string? _name;
+    private string _definition = "";
+    private Passage? _passage;
+
+    protected override void OnInitialized()
+    {
+        if (Pool.Count > 0)
+        {
+            var idx = DateOnly.FromDateTime(DateTime.Today).DayNumber % Pool.Count;
+            (_name, _definition) = Pool[idx];
+        }
+        Faith.Changed += OnFaithChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Faith.LoadAsync();
+        ComputePassage();
+    }
+
+    private void ComputePassage() =>
+        _passage = Faith.Selected.Count > 0
+            ? FaithLibrary.Daily(Faith.Selected, DateOnly.FromDateTime(DateTime.Today))
+            : null;
+
+    private void OnFaithChanged()
+    {
+        ComputePassage();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Faith.Changed -= OnFaithChanged;
+}

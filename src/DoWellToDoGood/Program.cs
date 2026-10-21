@@ -19,6 +19,7 @@ builder.Services.AddScoped<TipHistoryService>();
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddScoped<NavPrefsService>();
+builder.Services.AddScoped<CreateMenuState>();
 
 var host = builder.Build();
 

@@ -1,4 +1,4 @@
-@page "/sleep"
+@page "/track/sleep"
 @using System.Globalization
 @using DoWellToDoGood.Models
 @using DoWellToDoGood.Services
@@ -10,11 +10,13 @@
 <PageTitle>Sleep — Do Well to Do Good</PageTitle>
 
 <div class="mx-auto max-w-3xl px-6 space-y-6">
+    <TrackTabs />
+
     <PageHeader Title="Sleep journal" Subtitle="Log this morning, or pick any past date." Encrypted="Auth.IsSignedIn">
         <Actions>
             @if (Auth.IsSignedIn)
             {
-                <a class="btn" href="sleep/review">Review →</a>
+                <a class="btn" href="track/sleep/review">Review →</a>
             }
         </Actions>
     </PageHeader>
@@ -23,7 +25,7 @@
     {
         <div class="card text-center space-y-4">
             <p class="text-muted m-0">Sign in to keep a sleep journal — encrypted so only you can read it.</p>
-            <a class="btn btn-primary" href="signin">Sign in</a>
+            <a class="btn btn-primary" href="account">Sign in</a>
         </div>
     }
     else if (!Crypto.IsUnlocked)
@@ -175,7 +177,7 @@
                         }
                     </article>
                 }
-                <p class="text-sm"><a class="font-semibold" href="sleep/review">See your week &amp; month at a glance →</a></p>
+                <p class="text-sm"><a class="font-semibold" href="track/sleep/review">See your week &amp; month at a glance →</a></p>
             </section>
         }
     }
